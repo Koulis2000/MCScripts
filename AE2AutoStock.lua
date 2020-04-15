@@ -325,6 +325,9 @@ local function addFromChestButton_Callback()
 end
 
 local function scanForChestButton_Callback(guiID, id)
+	gpu.setBackground(0x000000)
+  	gpu.fill(1, 1, screenWidth, screenHeight, " ")
+  	
 	SaveSize(getChestSize())
 	SaveSide(getChestSide())
 	LoadSize()
