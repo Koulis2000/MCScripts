@@ -1,3 +1,4 @@
+local shell = require("shell")
 local component = require("component")
 local sides = require("sides")
 local fs = require("filesystem")
