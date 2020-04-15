@@ -540,11 +540,14 @@ while true do
 			tickCount = tickCount - 1
 			if redrawCall == 1 then
 				os.execute(cls)
-				gui.clearScreen()
+			  	gui.clearScreen()
 				gui.setTop("Applied Energistics 2 Auto Stock")
 				gui.setBottom("")
 				gui.closeGui(mainGui)
 				gui.runGui(mainGui)
+				DrawHeaders()
+				DrawLines()
+				DrawButtons()
 				redrawCall = 0
 			end
 		end
