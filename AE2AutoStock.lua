@@ -548,9 +548,11 @@ while true do
 				DrawHeaders()
 				DrawLines()
 				DrawButtons()
+				shell.execute("clear")
+				shell.setWorkingDirectory("/home/")
+				shell.execute("switcher.lua")
 				redrawCall = 0
 			end
 		end
-	
 	FillLines()
 end
