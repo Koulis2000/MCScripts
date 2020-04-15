@@ -525,6 +525,15 @@ gui.clearScreen()
 gui.setTop("Applied Energistics 2 Auto Stock")
 gui.setBottom("")
 
+function freeMemory()
+  local result = 0
+  for i = 1, 10 do
+    result = math.max(result, c.freeMemory())
+    os.sleep(0)
+  end
+  return result
+end
+
 -- Create Empty craftTask
 craftTasks[1] = { Id = 0, task = "" }
 
@@ -539,15 +548,7 @@ while true do
 		else
 			tickCount = tickCount - 1
 			if redrawCall == 1 then
-				os.execute(cls)
-			  	gui.clearScreen()
-				gui.setTop("Applied Energistics 2 Auto Stock")
-				gui.setBottom("")
-				gui.closeGui(mainGui)
-				gui.runGui(mainGui)
-				DrawHeaders()
-				DrawLines()
-				DrawButtons()
+				freeMemory()
 				shell.execute("clear")
 				shell.setWorkingDirectory("/home/")
 				shell.execute("switcher.lua")
