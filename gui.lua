@@ -14,9 +14,9 @@ local gui = {}
 
 local colorScreenBackground = 0x212121
 local colorScreenForeground = 0xd7d787
-local colorTopLineBackground = 0x2F419A
+local colorTopLineBackground = 0x313131
 local colorTopLineForeground = 0xd7d787
-local colorBottomLineBackground = 0x2F419A
+local colorBottomLineBackground = 0x313131
 local colorBottomLineForeground = 0xd7d787
 local colorFrameBackground = 0x212121
 local colorFrameForeground = 0xd7d787
