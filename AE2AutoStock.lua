@@ -10,8 +10,8 @@ local event = require("event")
 local inventory_controller = component.inventory_controller
 local screenWidth, screenHeight = gpu.getResolution()
 
-local finalChestSide
-local finalChestSize
+local finalChestSide = 0
+local finalChestSize = 0
 
 gui.checkVersion(2,5)
 
@@ -24,6 +24,36 @@ local craftTasks = {}
 local maxCpuUsage = 1
 local currentCpuUsage = 0
 
+local function LoadSide()
+	local file,err = io.open("side.cfg", "r")
+	if err == nil then
+		local data = file:read("*n")
+		finalChestSide = tonumber(data)
+		file:close()
+	end
+end
+
+local function SaveSide(side)
+	local file,err = io.open("side.cfg", "w")
+	file:write(side)
+	file:close()
+end
+
+local function LoadSize()
+	local file,err = io.open("size.cfg", "r")
+	if err == nil then
+		local data = file:read("*n")
+		finalChestSize = tonumber(data)
+		file:close()
+	end
+end
+
+local function SaveSize(size)
+	local file,err = io.open("size.cfg", "w")
+	file:write(size)
+	file:close()
+end
+
 local function LoadConfig()
 	local file,err = io.open("config.cfg", "r")
 	if err == nil then
@@ -32,12 +62,6 @@ local function LoadConfig()
 		gui.setText(mainGui, CpuMaxUsage, maxCpuUsage .. "")
 		file:close()
 	end
-end
-
-local function SaveConfig()
-	local file,err = io.open("config.cfg", "w")
-	file:write(maxCpuUsage)
-	file:close()
 end
 
 local function LoadItems()
@@ -237,8 +261,13 @@ local function getChestSize()
 end
 
 local function addFromChestButton_Callback()
-	finalChestSide = getChestSide()
-	finalChestSize = getChestSize()
+	if finalChestSide == 0 then
+		SaveSide(getChestSide())
+	end
+	if finalChestSize == 0 then
+		SaveSize(getChestSize())
+	end
+
 	chestItems = {}
 	for index = 1, finalChestSize do
 		local item = inventory_controller.getStackInSlot(finalChestSide, index)
@@ -263,7 +292,6 @@ local function addFromChestButton_Callback()
 				if chestItems[slot]["rawItemName"] == items[dupliCheck]["rawItemName"] and chestItems[slot]["rawItemNBT"] == items[dupliCheck]["rawItemNBT"] then
 					duplicateFound = 1
 					print("Duplicate found, merging Stock requirements...")
-					reportList.setText(reportListText)
 					items[dupliCheck]["StockRequirement"] = items[dupliCheck]["StockRequirement"]+chestItems[slot]["StockRequirement"]
 					break
 				end
@@ -281,6 +309,13 @@ local function addFromChestButton_Callback()
 			gui.showMsg("Maximum number of items reached (86 items).")
 		end
 	end
+end
+
+local function scanForChestButton_Callback(guiID, id)
+	SaveSize()
+	SaveSide()
+	LoadSize()
+	LoadSide()	
 end
 
 local function cancelButtonCallback(guiID, id)
@@ -387,7 +422,8 @@ local function DrawButtons()
 	RemoveButton = gui.newButton(mainGui, 12, 1, "Remove Item", RemoveItem_Callback)
 	ChangeButton = gui.newButton(mainGui, 26, 1, "Change Item", ChangeItem_Callback)
 	AddFromChestButton = gui.newButton(mainGui, 40, 1, "Add Item/s From Chest", addFromChestButton_Callback)
-	ExitButton = gui.newButton(mainGui, 64, 1, "Exit", exitButtonCallback)
+	ScanForChestButton = gui.newButton(mainGui, 64, 1, "Scan for Chest", scanForChestButton_Callback)
+	ExitButton = gui.newButton(mainGui, 76, 1, "Exit", exitButtonCallback)
 	CpuUsageLabel = gui.newLabel(mainGui, 118, 1, "CPU usage: ", 0x02243F, 0xF36E21, 13)
 	CpuMaxUsageLabel = gui.newLabel(mainGui, 134, 1, "Max CPU usage: ", 0x02243F, 0xF36E21, 15)
 	CpuMaxUsage = gui.newText(mainGui, 149, 1, 4, maxCpuUsage .. "", CpuMaxUsage_Callback, 4, false)
@@ -465,6 +501,8 @@ end
 DrawHeaders()
 DrawLines()
 DrawButtons()
+LoadSize()
+LoadSide()
 LoadConfig()
 LoadItems()
 
