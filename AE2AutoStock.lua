@@ -11,6 +11,8 @@ local event = require("event")
 local inventory_controller = component.inventory_controller
 local screenWidth, screenHeight = gpu.getResolution()
 
+local redrawCall = 0
+
 local finalChestSide = 0
 local finalChestSize = 0
 
@@ -262,7 +264,9 @@ local function getChestSize()
 end
 
 local function addFromChestButton_Callback()
-	if finalChestSide == 0 then
+	gpu.setBackground(0x000000)
+  	gpu.fill(1, 1, screenWidth, screenHeight, " ")
+  		if finalChestSide == 0 then
 		SaveSide(getChestSide())
 	end
 	if finalChestSize == 0 then
@@ -310,9 +314,8 @@ local function addFromChestButton_Callback()
 			gui.showMsg("Maximum number of items reached (86 items).")
 		end
 	end
-	shell.execute("clear")
-	shell.setWorkingDirectory("/home/")
-	shell.execute("AE2AutoStock.lua")
+
+	redrawCall = 1
 end
 
 local function scanForChestButton_Callback(guiID, id)
@@ -320,9 +323,8 @@ local function scanForChestButton_Callback(guiID, id)
 	SaveSide(getChestSide())
 	LoadSize()
 	LoadSide()
-	shell.execute("clear")
-	shell.setWorkingDirectory("/home/")
-	shell.execute("AE2AutoStock.lua")
+
+	redrawCall = 1
 end
 
 local function cancelButtonCallback(guiID, id)
@@ -524,12 +526,26 @@ craftTasks[1] = { Id = 0, task = "" }
 local tickCount = 0
 
 while true do
-   gui.runGui(mainGui)
-   if tickCount <= 0 then
-      CheckItemsAndCraft()
-      tickCount = 50
-   else
-      tickCount = tickCount - 1
-   end
-   FillLines()
+	gui.runGui(mainGui)
+		if tickCount <= 0 then
+			CheckItemsAndCraft()
+			tickCount = 50
+		else
+			tickCount = tickCount - 1
+		end
+	if redrawCall = 1 then
+		os.execute(cls)
+		gui.clearScreen()
+		gui.setTop("Applied Energistics 2 Auto Stock")
+		gui.setBottom("")
+		DrawHeaders()
+		DrawLines()
+		DrawButtons()
+		LoadSize()
+		LoadSide()
+		LoadConfig()
+		LoadItems()
+		redrawCall = 0
+	end
+	FillLines()
 end
