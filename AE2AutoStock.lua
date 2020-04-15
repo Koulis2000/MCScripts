@@ -67,6 +67,12 @@ local function LoadConfig()
 	end
 end
 
+local function SaveConfig()
+	local file,err = io.open("config.cfg", "w")
+	file:write(maxCpuUsage)
+	file:close()
+end
+
 local function LoadItems()
 	local file,err = io.open("items.cfg", "r")
 	if err == nil then
@@ -108,12 +114,12 @@ mainGui = gui.newGui(1, 2, 159, 48, true)
 
 local function DrawHeaders()
 	Header_Name = gui.newLabel(mainGui, 4, 2, "Name", 0x02243F, 0xF36E21, 30)
-	Header_Current = gui.newLabel(mainGui, 35, 2, "Current (StockRequirement)", 0x02243F, 0xF36E21, 18)
+	Header_Current = gui.newLabel(mainGui, 35, 2, "Current (Requirement)", 0x02243F, 0xF36E21, 18)
 	Header_Crafting = gui.newLabel(mainGui, 54, 2, "Crafting", 0x02243F, 0xF36E21, 8)
 	Header_Message = gui.newLabel(mainGui, 63, 2, "Message", 0x02243F, 0xF36E21, 15)
 	Header_Line = gui.newHLine(mainGui, 1, 3, 76)
 	Header2_Name = gui.newLabel(mainGui, 84, 2, "Name", 0x02243F, 0xF36E21, 30)
-	Header2_Current = gui.newLabel(mainGui, 115, 2, "Current (StockRequirement)", 0x02243F, 0xF36E21, 18)
+	Header2_Current = gui.newLabel(mainGui, 115, 2, "Current (Requirement)", 0x02243F, 0xF36E21, 18)
 	Header2_Crafting = gui.newLabel(mainGui, 134, 2, "Crafting", 0x02243F, 0xF36E21, 8)
 	Header2_Message = gui.newLabel(mainGui, 143, 2, "Message", 0x02243F, 0xF36E21, 15)
 	Header2_Line = gui.newHLine(mainGui, 81, 3, 76)
@@ -532,20 +538,16 @@ while true do
 			tickCount = 50
 		else
 			tickCount = tickCount - 1
+			if redrawCall == 1 then
+				os.execute(cls)
+				gui.clearScreen()
+				gui.setTop("Applied Energistics 2 Auto Stock")
+				gui.setBottom("")
+				gui.closeGui(mainGui)
+				gui.runGui(mainGui)
+				redrawCall = 0
+			end
 		end
-	if redrawCall == 1 then
-		os.execute(cls)
-		gui.clearScreen()
-		gui.setTop("Applied Energistics 2 Auto Stock")
-		gui.setBottom("")
-		DrawHeaders()
-		DrawLines()
-		DrawButtons()
-		LoadSize()
-		LoadSide()
-		LoadConfig()
-		LoadItems()
-		redrawCall = 0
-	end
+	
 	FillLines()
 end
