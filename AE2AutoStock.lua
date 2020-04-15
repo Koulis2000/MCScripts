@@ -533,7 +533,7 @@ while true do
 		else
 			tickCount = tickCount - 1
 		end
-	if redrawCall = 1 then
+	if redrawCall == 1 then
 		os.execute(cls)
 		gui.clearScreen()
 		gui.setTop("Applied Energistics 2 Auto Stock")
