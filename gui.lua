@@ -12,39 +12,39 @@ local screenWidth, screenHeight = gpu.getResolution()
 
 local gui = {}
 
-local colorScreenBackground = 0x011E38
-local colorScreenForeground = 0xffaf00
+local colorScreenBackground = 0x212121
+local colorScreenForeground = 0xd7d787
 local colorTopLineBackground = 0x2F419A
-local colorTopLineForeground = 0xffaf00
+local colorTopLineForeground = 0xd7d787
 local colorBottomLineBackground = 0x2F419A
-local colorBottomLineForeground = 0xffaf00
-local colorFrameBackground = 0x011E38
-local colorFrameForeground = 0xffaf00
+local colorBottomLineForeground = 0xd7d787
+local colorFrameBackground = 0x212121
+local colorFrameForeground = 0xd7d787
 local colorButtonBackground = 0x0E103D
-local colorButtonForeground = 0xffaf00
+local colorButtonForeground = 0xd7d787
 local colorButtonClickedBackground = 0xFDB515
 local colorButtonClickedForeground = 0x000000
 local colorButtonDisabledBackground = 0x994B22
 local colorButtonDisabledForeground = 0x000000
 local colorTextBackground = 0x0E103D
-local colorTextForeground = 0xffaf00
+local colorTextForeground = 0xd7d787
 local colorInputBackground = 0x0E103D
-local colorInputForeground = 0xffaf00
+local colorInputForeground = 0xd7d787
 local colorProgressBackground = 0x0E103D
-local colorProgressForeground = 0xffaf00
+local colorProgressForeground = 0xd7d787
 local colorProgressNumberForeground = 0x000000
-local colorListBackground = 0x011E38
-local colorListForeground = 0xffaf00
+local colorListBackground = 0x212121
+local colorListForeground = 0xd7d787
 local colorListActiveBackground = 0x0E103D
-local colorListActiveForeground = 0xffaf00
+local colorListActiveForeground = 0xd7d787
 local colorListDisabledBackground = 0x0E103D
-local colorListDisabledForeground = 0xffaf00
+local colorListDisabledForeground = 0xd7d787
 local colorVProgressBackground = 0x0E103D
-local colorVProgressForeground = 0xffaf00
+local colorVProgressForeground = 0xd7d787
 local colorVSliderBackground = 0x0E103D
-local colorVSliderForeground = 0xffaf00
+local colorVSliderForeground = 0xd7d787
 local colorChartBackground = 0x0E103D
-local colorChartForeground = 0xffaf00
+local colorChartForeground = 0xd7d787
 
 local displayed = false
 
@@ -580,8 +580,8 @@ function gui.displayWidget(guiID, widgetID)
 end
 
 function gui.exit()
-  gpu.setBackground(0xffaf00)
-  gpu.setForeground(0xffaf00)
+  gpu.setBackground(0xd7d787)
+  gpu.setForeground(0xd7d787)
   gpu.fill(1, 1, screenWidth, screenHeight, " ")
   os.exit()
 end
