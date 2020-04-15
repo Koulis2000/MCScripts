@@ -327,8 +327,8 @@ end
 local function scanForChestButton_Callback(guiID, id)
 	gpu.setBackground(0x000000)
   	gpu.fill(1, 1, screenWidth, screenHeight, " ")
-  	
-	SaveSize(getChestSize())
+
+  	SaveSize(getChestSize())
 	SaveSide(getChestSide())
 	LoadSize()
 	LoadSide()
