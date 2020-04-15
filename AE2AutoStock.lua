@@ -309,13 +309,19 @@ local function addFromChestButton_Callback()
 			gui.showMsg("Maximum number of items reached (86 items).")
 		end
 	end
+	shell.execute("clear")
+	shell.setWorkingDirectory("/home/")
+	shell.execute("AE2AutoStock.lua")
 end
 
 local function scanForChestButton_Callback(guiID, id)
 	SaveSize(getChestSize())
 	SaveSide(getChestSide())
 	LoadSize()
-	LoadSide()	
+	LoadSide()
+	shell.execute("clear")
+	shell.setWorkingDirectory("/home/")
+	shell.execute("AE2AutoStock.lua")
 end
 
 local function cancelButtonCallback(guiID, id)
