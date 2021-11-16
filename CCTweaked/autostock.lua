@@ -1,7 +1,6 @@
 local settings = require "ae2.autostocksettings"
 local logged = { item={}, fluid={} }
 local displayProperties = 0
-local oldSizeX, oldSizeY = 0,0
 
 local Status = { OK = 1, CRAFTABLE = 2, UNCRAFTABLE = 3, CRAFTING = 4 }
 local StatusColours = {
@@ -11,8 +10,8 @@ local StatusColours = {
   [Status.CRAFTING] = colours.lightBlue,
 }
 
-local monitor = peripheral.find("monitor")
-local width,height
+local monitor = peripheral.wrap( "left" )
+local monitorResolutionXX, monitorResolutionXY
 local resolutionScale = 0.5
 local resolutionTable = {
         ["0.5"] = {{15,36,57,79,100,121,143,164},{10,24,38,52,67,81}},
@@ -26,14 +25,29 @@ local resolutionTable = {
         ["4.5"] = {{2,4,6,9,11,13,16,18},{1,3,4,6,7,9}},
         ["5"]   = {{1,4,6,8,10,12,14,16},{1,2,4,5,7,8}},
     }
-local screenSizeX, screenResX
-local screenSizeY, screenResY
-local scaledResX, scaledResY
-local columns
-local columnWidth
+local monitorSizeX, monitorResolutionXX, scaledMonitorResolutionX
+local monitorSizeY, monitorResolutionXY, scaledMonitorResolutionY
+local oldMonitorSizeX, oldMonitorSizeY = 0,0
 local availableLines
+local columnTable = {}
+local amountOfColumns
+local currentColumn
 
-function NearestValue(table, number)
+function assert_arg (n,val,tp,verify,msg,lev)
+    if type(val) ~= tp then
+        error(("argument %d expected a '%s', got a '%s'"):format(n,tp,type(val)),lev or 2)
+    end
+    if verify and not verify(val) then
+        error(("argument %d: '%s' %s"):format(n,val,msg),lev or 2)
+    end
+    return val
+end
+
+local function assert_string (n,s)
+    assert_arg(n,s,'string')
+end
+
+function nearestValue(table, number)
     local smallestSoFar, smallestIndex
     for i, y in ipairs(table) do
         if not smallestSoFar or (math.abs(number-y) < smallestSoFar) then
@@ -41,50 +55,66 @@ function NearestValue(table, number)
             smallestIndex = i
         end
     end
-    return smallestIndex, table[smallestIndex]
+    return smallestIndex
 end
 
-local function getMonSize(x,y,scale)
-   return resolutionTable[scale][1][x],resolutionTable[scale][2][y]
+local function getMonitorResolution(mon)
+    local x,y = mon.getSize()
+    return x,y
+end
+
+local function getMonitorSize(mon, scale)
+    local x,y = mon.getSize()
+    return nearestValue(resolutionTable[tostring(scale)][1], x), nearestValue(resolutionTable[tostring(scale)][2], y)
+end
+
+local function getScaledMonitorResolution(mon, scale)
+    local x,y = getMonitorSize(mon, scale)
+    return resolutionTable[tostring(scale)][1][x],resolutionTable[tostring(scale)][2][y]
+end
+
+local function writeTitle(resX, resY, scale)
+    local programName = "AutoStock  v1.0.2"
+    local programTitle = "<- "..programName.." ->"
+    monitor.setTextScale(scale)
+    monitor.setCursorPos(1, 1)
+    monitor.write("/"..string.rep("-", resX-2).."\\")
+    monitor.setCursorPos(1, 2)
+    monitor.write("|")
+    monitor.setCursorPos((scaledMonitorResolutionX/2)-(string.len(programTitle))/2+1, 2)
+    monitor.write(programTitle)
+    monitor.setCursorPos(scaledMonitorResolutionX, 2)
+    monitor.write("|")
+    monitor.setCursorPos(1, 3)
+    monitor.write("\\"..string.rep("-", scaledMonitorResolutionX-2).."/")
 end
 
 function initializeScreen()
-    monitor.setTextScale(1)
-    width,height = monitor.getSize()
+    local max_summary = 10
+    local max_name = 20
+    local requiredSpace = max_name+1+max_summary
+
     monitor.setTextScale(resolutionScale)
-    screenSizeX, screenResX = NearestValue(resolutionTable["1"][1],width)
-    screenSizeY, screenResY = NearestValue(resolutionTable["1"][2],height)
-    scaledResX, scaledResY = getMonSize(screenSizeX,screenSizeY,tostring(resolutionScale))
-    availableLines = scaledResY-3
 
-    if screenSizeX <= 2 then
-        columns = 1
-    elseif screenSizeX == 3 then
-        columns = 2
-    elseif screenSizeX == 4 then
-        columns = 3
-    elseif screenSizeX == 5 then
-        columns = 3
-    elseif screenSizeX == 6 then
-        columns = 4
-    elseif screenSizeX == 7 then
-        columns = 4
-    elseif screenSizeX == 8 then
-        columns = 5
-    end
+    monitorResolutionX, monitorResolutionY = getMonitorResolution(monitor)
 
-    columnWidth = scaledResX / columns
+    monitorSizeX, monitorSizeY = getMonitorSize(monitor, resolutionScale)
+    oldMonitorSizeX, oldMonitorSizeY = monitorSizeX, monitorSizeY
+    print("New Monitor Size: "..monitorSizeX.."x"..monitorSizeY)
 
-    if oldSizeX ~= screenSizeX or oldSizeY ~= screenSizeY then
-        displayUpdate = 1
-    end
-    if displayUpdate == 1 then
-        oldSizeX = screenSizeX
-        oldSizeY = screenSizeY
-        print("\nNew Monitor Size: "..screenSizeX.."x"..screenSizeY)
-        --print("New Standard Resolution: "..width.."x"..height)
-        print("New Year's Resolution: "..scaledResX.."x"..scaledResY)
-        displayUpdate = 0
+    scaledMonitorResolutionX, scaledMonitorResolutionY = getScaledMonitorResolution(monitor, resolutionScale)
+    print("New Year's Resolution: "..scaledMonitorResolutionX.."x"..scaledMonitorResolutionY)
+
+    availableLines = scaledMonitorResolutionY-3
+    amountOfColumns = math.floor((scaledMonitorResolutionX / requiredSpace)+0.1)
+    columnWidth = (scaledMonitorResolutionX / amountOfColumns)-2
+    print("It will comfortably fit "..amountOfColumns.." columns.".."\n")
+
+    writeTitle(scaledMonitorResolutionX, scaledMonitorResolutionY, resolutionScale)
+
+    for key = 1, amountOfColumns, 1  do
+            columnTable["columnWindow"..tostring(key)] = window.create(monitor, columnWidth*(key-1)+2, 4, columnWidth, availableLines)
+            --columnTable["columnWindow"..tostring(key)].write("This is window "..key)
     end
 end
 
@@ -174,49 +204,44 @@ local function restock(info)
 end
 
 
-local function writeTitle(resX, resY, scale)
-    local programName = "AutoStock  v1.0.2"
-    local programTitle = "<- "..programName.." ->"
-    monitor.setTextScale(scale)
-    monitor.setCursorPos(1, 1)
-    monitor.write("/"..string.rep("-", resX-2).."\\")
-    monitor.setCursorPos(1, 2)
-    monitor.write("|")
-    monitor.setCursorPos((scaledResX/2)-(string.len(programTitle))/2+1, 2)
-    monitor.write(programTitle)
-    monitor.setCursorPos(scaledResX, 2)
-    monitor.write("|")
-    monitor.setCursorPos(1, 3)
-    monitor.write("\\"..string.rep("-", scaledResX-2).."/")
+function shorten(s,w)
+    local ellipsis = "..."
+    local n_ellipsis = utf8.len(ellipsis)
+    assert_string(1,s)
+    if utf8.len(s) > w then
+        return s:sub(1,w-n_ellipsis) .. ellipsis
+    end
+    return s
 end
 
 local function report(info, msg)
-    initializeScreen()
-    local columnIndex = 0
     if msg then
         monitor.setBackgroundColour(colours.red)
         monitor.setTextColour(colours.white)
-        monitor.clear()
-        writeTitle(scaledResX,scaledResY,resolutionScale)
-        monitor.setCursorPos((scaledResX - string.len(msg))/2+1, scaledResY/2+1)
+        --monitor.clear()
+        monitor.setCursorPos((scaledMonitorResolutionX - string.len(msg))/2+1, scaledMonitorResolutionY/2+1)
         monitor.write(msg)
     else
         monitor.setBackgroundColour(colours.black)
         monitor.setTextColour(colours.white)
-        monitor.clear()
+        --monitor.clear()
 
-        writeTitle(scaledResX,scaledResY,resolutionScale)
-
+        for x = 1, amountOfColumns,1 do
+            columnTable["columnWindow"..tostring(x)].clear()
+        end
         for line,v in ipairs(info) do
-            if line > (availableLines)*(columnIndex+1) and columnIndex < columns then
-                columnIndex = columnIndex + 1
-            elseif line > (availableLines)*(columnIndex+1) and columnIndex == columns then break end
-            monitor.setCursorPos(2 + (columnWidth*columnIndex), line + 3 - ((availableLines)*columnIndex))
-            monitor.write(v.name)
-            monitor.setTextColour(StatusColours[v.status])
-            monitor.setCursorPos((columnWidth*(columnIndex + 1))- 2 - string.len(tostring(x)), line + 3 -((availableLines)*columnIndex))
-            monitor.write(v.summary)
-            monitor.setTextColour(colours.white)
+            local column = math.floor((line/availableLines)+1)
+            local columnWindow = columnTable["columnWindow"..tostring(column)]
+
+            if line > (availableLines)*(column+1) and column == amountOfColumns then break end
+
+            columnWindow.setTextColour(colours.white)
+            columnWindow.setCursorPos(1, line-(availableLines*(column-1)))
+            columnWindow.write(shorten(v.name,columnWidth-(utf8.len(v.summary)+1)))
+            columnWindow.setTextColour(StatusColours[v.status])
+            columnWindow.setCursorPos((columnWidth+1) - string.len(tostring(v.summary)), line-(availableLines*(column-1)))
+            columnWindow.write(v.summary)
+            columnWindow.setTextColour(colours.white)
         end
     end
 end
@@ -259,8 +284,13 @@ end
 print("AutoStock running, press ENTER to halt")
 
 local run = true
-initializeScreen()
+
 while run do
+    monitorSizeX, monitorSizeY = getMonitorSize(monitor, resolutionScale)
+    if oldMonitorSizeX ~= monitorSizeX or oldMonitorSizeY ~= monitorSizeY then
+        print("\nMonitor size changed.")
+        initializeScreen()
+    end
     inv, msg = inventory()
     info = check(inv)
     restock(info)
