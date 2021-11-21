@@ -1,4 +1,6 @@
+sleep(1)
 local tArgs = { ... }
+local chest = peripheral.find("minecraft:chest")
 
 local expect = (require "cc.expect").expect
 local settings = require "ae2.autostocksettings"
@@ -209,27 +211,73 @@ elseif tArgs[1] == "refresh" and #tArgs == 2 then
     end
 elseif tArgs[1] == "item" then
     if #tArgs == 1 then
-        -- "stock item"
+        -- "stock item S N"
         print("Stocked items:")
         list(settings.handlers.item)
     elseif #tArgs == 3 then
         setQuantity(tArgs[2], tonumber(tArgs[3]), settings.handlers.item)
+    elseif #tArgs > 3 then
+        -- "stock item S S S... N"
+        for i = 2, #tArgs-2, 1 do
+            setQuantity(tArgs[i], tonumber(tArgs[#tArgs]), settings.handlers.item)
+        end
     else
         printError("Command not understood.  See 'help stock'.")
     end
+elseif tArgs[1] == "inventory" and tArgs[2] == "varies" then
+    -- "stock inventory varies"
+    if #chest.list() ~= 0 then
+        for i = 1, #chest.list(), 1 do
+            setQuantity(chest.getItemDetail(i).name, chest.getItemDetail(i).count, settings.handlers.item)
+        end
+    else
+        printError("Inventory is empty, thus I have nothing to add.")
+    end
+elseif tArgs[1] == "inventory" then
+    -- "stock inventory N"
+    if #chest.list() ~= 0 then
+        for i = 1, #chest.list(), 1 do
+            setQuantity(chest.getItemDetail(i).name, tonumber(tArgs[2]), settings.handlers.item)
+        end
+    else
+        printError("Inventory is empty, thus I have nothing to add.")
+    end
 elseif tArgs[1] == "fluid" then
     if #tArgs == 1 then
-        -- "stock fluid"
+        -- "stock fluid S N"
         print("Stocked fluids:")
         list(settings.handlers.fluid)
     elseif #tArgs == 3 then
         setQuantity(tArgs[2], tonumber(tArgs[3]), settings.handlers.fluid)
+    elseif #tArgs > 3 then
+        -- "stock fluid S S S... N"
+        for i = 2, #tArgs-2, 1 do
+            setQuantity(tArgs[i], tonumber(tArgs[#tArgs]), settings.handlers.item)
+        end
     else
         printError("Command not understood.  See 'help stock'.")
     end
 elseif (tArgs[1] == "remove" or tArgs[1] == "delete") and #tArgs == 2 then
+        -- "stock remove N"
     remove(tonumber(tArgs[2]))
+elseif (tArgs[1] == "remove" or tArgs[1] == "delete") and #tArgs > 2 then
+    -- "stock remove N N N..."
+    -- Isolating the numbers from the argument list
+    local num = {}
+    for i = 2, #tArgs, 1 do
+        table.insert(num, tonumber(tArgs[i]))
+    end
+    --[[ Sorting the numbers in descending fashion.
+    This is essential in order* to remove the correct items from a table that
+    gets shorter after every loop, meaning the item that was in position 9
+    is now in position 8 after removing a number in a lower position.]]--
+    --*no pun intended
+    table.sort(num, function(a, b) return a > b end)
+    for i = 1, #num, 1 do
+        remove(tonumber(num[i]))
+    end
 elseif tArgs[1] == "move" and #tArgs == 3 then
+    -- "stock move N N"
     move(tonumber(tArgs[2]), tonumber(tArgs[3]))
 elseif tArgs[1] == "start" and #tArgs == 1 then
     startService()
