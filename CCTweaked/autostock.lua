@@ -2,18 +2,22 @@ sleep(1)
 local settings = require "ae2.autostocksettings"
 local logged = { item={}, fluid={} }
 local displayProperties = 0
-local CPUs = ae2.getCraftingCPUs()
+local CPUs
+local CPUWindow
 
 local Status = { OK = 1, CRAFTABLE = 2, UNCRAFTABLE = 3, CRAFTING = 4 }
 local StatusColours = {
   [Status.OK] = colours.green,
   [Status.CRAFTABLE] = colours.orange,
   [Status.UNCRAFTABLE] = colours.red,
-  [Status.CRAFTING] = colours.lightBlue,
+  [Status.CRAFTING] = colours.cyan,
 }
 
+local max_summary = 10
+local max_name = 20
+local cpuSize = 10
+
 local monitor = peripheral.find( "monitor" )
-local monitorResolutionXX, monitorResolutionXY
 local resolutionScale = 0.5
 local resolutionTable = {
         ["0.5"] = {{15,36,57,79,100,121,143,164},{10,24,38,52,67,81}},
@@ -27,8 +31,8 @@ local resolutionTable = {
         ["4.5"] = {{2,4,6,9,11,13,16,18},{1,3,4,6,7,9}},
         ["5"]   = {{1,4,6,8,10,12,14,16},{1,2,4,5,7,8}},
     }
-local monitorSizeX, monitorResolutionXX, scaledMonitorResolutionX
-local monitorSizeY, monitorResolutionXY, scaledMonitorResolutionY
+local monitorSizeX, scaledMonitorResolutionX
+local monitorSizeY, scaledMonitorResolutionY
 local oldMonitorSizeX, oldMonitorSizeY = 0,0
 local availableLines
 local columnTable = {}
@@ -128,7 +132,7 @@ local function writeTitle(resX, resY, scale)
 end
 
 local function drawCPU(posX, posY, cpu, noCPU)
-    local CPUWindow = columnTable["columnWindow99"]
+    CPUWindow = columnTable["columnWindow99"]
     local coprocessors = cpu["coprocessors"].."T"
     local storage = getSlim(cpu["storage"])
     local descriptionPosition = (math.floor((11-(string.len(coprocessors..storage)))/2)+0.1)
@@ -167,26 +171,23 @@ local function drawCPU(posX, posY, cpu, noCPU)
 end
 
 local function drawCPUs(xSize)
-    local cpuSize = 10
+    if  CPUs == nil then CPUs = ae2.getCraftingCPUs() end
     local cpuMargin = (xSize-cpuSize)/(#CPUs-1)
     for i,v in ipairs(CPUs) do
+        if CPUs[i] ~= nil then
             drawCPU(1+(cpuMargin*(i-1)),1,CPUs[i],i)
+        end
     end
-    local CPUWindow = columnTable["columnWindow99"]
+    CPUWindow = columnTable["columnWindow99"]
     CPUWindow.setCursorPos(1,cpuSize)
     CPUWindow.setTextColour(colours.white)
     CPUWindow.write(string.rep("-", scaledMonitorResolutionX))
 end
 
 function initializeScreen()
-    local max_summary = 10
-    local max_name = 20
     local requiredSpace = max_name+1+max_summary
-    local cpuColSize = 11
 
     monitor.setTextScale(resolutionScale)
-
-    monitorResolutionX, monitorResolutionY = getMonitorResolution(monitor)
 
     monitorSizeX, monitorSizeY = getMonitorSize(monitor, resolutionScale)
     oldMonitorSizeX, oldMonitorSizeY = monitorSizeX, monitorSizeY
@@ -203,7 +204,7 @@ function initializeScreen()
     writeTitle(scaledMonitorResolutionX, scaledMonitorResolutionY, resolutionScale)
 
     for key = 1, amountOfColumns,1  do
-            columnTable["columnWindow"..tostring(key)] = window.create(monitor, columnWidth*(key-1)+2, monitorResolutionY-availableLines, columnWidth, availableLines)
+            columnTable["columnWindow"..tostring(key)] = window.create(monitor, columnWidth*(key-1)+2, scaledMonitorResolutionY-availableLines, columnWidth, availableLines)
     end
     columnTable["columnWindow99"] = window.create(monitor, 1, 4, scaledMonitorResolutionX, 10)
 end
