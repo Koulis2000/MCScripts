@@ -1,7 +1,22 @@
 -- Import required APIs
-os.loadAPI("button.lua")
+--os.loadAPI("button.lua")
+local waltz = require("waltz")
 
 settings.load()
+
+theme = {
+    titleForegroundColour = 0x200,
+    titleBackgroundColour = 0x80,
+    textForegroundColour = 0x1,
+    textBackgroundColour = 0x8000,
+    successForegroundColour = 0x20,
+    successBackgroundColour = 0x8000,
+    failureForegroundColour = 0x4000,
+    failureBackgroundColour = 0x8000,
+    buttonForegroundColour = 0x800,
+    buttonBackgroundColour = 0x8000,
+    textScale = 0.5
+}
 
 -- Define constants
 local idConstant = 1
@@ -16,7 +31,7 @@ local meBridge = peripheral.find("meBridge")
 local monitor = peripheral.find("monitor")
 
 -- Create button instance
-local btnInstance = button.new("top")
+--local btnInstance = button.new("top")
 
 -- Set some settings and preferences
 monitor.setTextScale(0.5)
@@ -26,6 +41,10 @@ local validTypes = {"chest", "shulker_box", "barrel", "backpack"}
 local winX, winY = monitor.getSize()
 local winHeaders = window.create(monitor, 4, 4, winX - 8, winY - 10)
 local win = window.create(monitor, 4, 5, winX - 8, winY - 10)
+local g = Waltz.create(win, theme, "")
+local winButtons = {}
+
+--local btnCount = button.new(win)
 local indexPosition = 0
 
 -- Function to check if an inventory exists (or, truthfully, if part of its id matches the above strings)
@@ -85,6 +104,21 @@ local function drawBox(xMin, xMax, yMin, yMax, title, bcolor, tcolor)
     monitor.setTextColor(colors.white)
 end
 
+local function changeItemCount(displayName, newCount)
+    local meItems = loadSettings("meItems")
+
+    for _, item in ipairs(meItems) do
+        if item[nameConstant] == displayName then
+            item[countConstant] = newCount
+            print("Item count changed for '" .. displayName .. "' to " .. newCount)
+            break
+        end
+    end
+
+    saveSettings("meItems", meItems)
+    --updateMeItems()
+end
+
 -- Function to create new window
 local function createWindow(x, y, width, height)
     local win = window.create(monitor, x, y, width, height)
@@ -136,6 +170,71 @@ function writeToWindow(win, text, line, column, txtback, txtcolor, truncate, fil
         filler = " " .. string.rep(".", columnWidth - string.len(text)-2) -- Generate the filler text
         win.write(filler)
     end
+end
+
+-- Function to write editable text to window on the monitor
+function writeEditableToWindow(win, item, text, line, column, txtback, txtcolor, truncate, fillLine)
+    local winX, winY = win.getSize()
+    win.setBackgroundColor(txtback)
+    win.setTextColor(txtcolor)
+    local line = line
+
+    -- Determine the column width based on the column number
+    local columnWidth
+    if column == 1 then
+        columnWidth = math.floor(winX * 4 / 8) -- Column width is 4/8th of the screen for the first column
+    elseif column == 2 or column == 3 then
+        columnWidth = math.floor(winX / 8) -- Column width is 1/8th of the screen for the second and third columns
+    else
+        columnWidth = math.floor(winX * 2 / 8) -- Column width is 2/8th of the screen for the fourth column
+    end
+
+    -- Truncate the text if its length exceeds the column width and if truncate is true
+    if truncate and string.len(text) > columnWidth then
+        text = string.sub(text, 1, columnWidth) -- Truncate the text to fit the column width
+    end
+
+    -- Determine the starting position based on the column number
+    local x
+    if column == 1 then
+        x = 1 -- Start at the leftmost position for the first column
+    elseif column == 2 then
+        x = math.floor(winX * 4 / 8) + 1 -- Start at the position after the first column for the second column
+    elseif column == 3 then
+        x = math.floor(winX * 5 / 8) + 3 -- Start at the position after the second column for the third column
+    else
+        x = math.floor(winX * 6 / 8) + 1 -- Start at the position after the third column for the fourth column
+    end
+
+    -- Calculate the position of the buttons
+    local buttonX1 = x + 1
+    local buttonX2 = x + columnWidth - 2
+
+    local btnMinusId = "btnMinus"..line
+    local btnPlusId = "btnPlus"..line
+    
+    winButtons[btnMinusId] = Button.create(g, "-", colours.black, colours.red, 1, 1, buttonX1, 1)
+    winButtons[btnPlusId] = Button.create(g, "+", colours.black, colours.red, 1, 1, buttonX2, 1)
+
+    if not winButtons[btnMinusId] then
+        winButtons[btnMinusId]:setAction(function() changeItemCount(item[nameConstant], item[countConstant] - 1)end)
+    end
+    if not winButtons[btnPlusId] then
+        winButtons[btnPlusId]:setAction(function() changeItemCount(item[nameConstant], item[countConstant] + 1)end)
+    end
+
+    -- Write the editable text
+    win.setBackgroundColor(txtback)
+    win.setTextColor(txtcolor)
+    win.setCursorPos(x, line)
+    win.write(text)
+
+    -- Fill the remaining space in the column with repeatable character if fillLine is true
+    --if fillLine and string.len(text) < columnWidth then
+      --  local filler = string.rep(".", columnWidth - string.len(text) - 2) -- Generate the filler text
+        --win.write(filler)
+    --end
+    term.redirect(term.native())
 end
 
 -- Function to fakescroll the window
@@ -292,7 +391,7 @@ local function displayItems()
             textColor = colors.lightGray
         end
 
-        paintutils.drawLine(1, row+indexPosition, winX, row+indexPosition, lineColor)
+        --paintutils.drawLine(1, row+indexPosition, winX, row+indexPosition, lineColor)
 
         if name and name ~= "" then
             local success, meItem = pcall(meBridge.getItem, { name = name })
@@ -303,15 +402,18 @@ local function displayItems()
 
                 if prevAvailableAmounts[displayName] ~= availableAmount then
                     writeToWindow(win, tostring(availableAmount) , row+indexPosition, columnStock, lineColor, textColor, true, true)
-                    writeToWindow(win, tostring(min), row+indexPosition, columnRequested, lineColor, textColor, true, true)
+                    writeEditableToWindow(win, item, min, row+indexPosition, columnRequested, lineColor, textColor, true, true)
+                    --writeToWindow(win, tostring(min), row+indexPosition, columnRequested, lineColor, textColor, true, true)
                     prevAvailableAmounts[displayName] = availableAmount
                 elseif prevAvailableAmounts[displayName] >= availableAmount then
                     writeToWindow(win, tostring(availableAmount) , row+indexPosition, columnStock, lineColor, textColor, true, true)
-                    writeToWindow(win, tostring(min), row+indexPosition, columnRequested, lineColor, textColor, true, true)
+                    writeEditableToWindow(win, item, min, row+indexPosition, columnRequested, lineColor, textColor, true, true)
+                    --writeToWindow(win, tostring(min), row+indexPosition, columnRequested, lineColor, textColor, true, true)
                     prevAvailableAmounts[displayName] = availableAmount
                 elseif not prevAvailableAmounts[displayName] then
                     writeToWindow(win, tostring(availableAmount) , row+indexPosition, columnStock, lineColor, textColor, true, true)
-                    writeToWindow(win, tostring(min), row+indexPosition, columnRequested, lineColor, textColor, true, true)
+                    writeEditableToWindow(win, item, min, row+indexPosition, columnRequested, lineColor, textColor, true, true)
+                    --writeToWindow(win, tostring(min), row+indexPosition, columnRequested, lineColor, textColor, true, true)
                     prevAvailableAmounts[displayName] = availableAmount
                 end
 
@@ -345,13 +447,15 @@ local function displayItems()
                 end
             else
                 writeToWindow(win, displayText, row+indexPosition, columnName, lineColor, colors.red, true, true)
-                writeToWindow(win, "0/" .. min, row+indexPosition, columnStock, lineColor, colors.red, true, true)
-                writeToWindow(win, "Not available", row+indexPosition, columnRequested, lineColor, colors.red, true, true)
+                writeToWindow(win, "0", row+indexPosition, columnStock, lineColor, colors.red, true, true)
+                writeToWindow(win, "0", row+indexPosition, columnRequested, lineColor, colors.red, true, true)
+                writeToWindow(win, "N/A", row+indexPosition, columnStatus, lineColor, colors.red, true, true)
             end
         else
             writeToWindow(win, displayText, row+indexPosition, columnName, lineColor, colors.red, true, true)
-            writeToWindow(win, "0/" .. min, row+indexPosition, columnStock, lineColor, colors.red, true, true)
-            writeToWindow(win, "No match", row+indexPosition, columnRequested, lineColor, colors.red, true, true)
+            writeToWindow(win, "0", row+indexPosition, columnStock, lineColor, colors.red, true, true)
+            writeToWindow(win, "0", row+indexPosition, columnRequested, lineColor, colors.red, true, true)
+            writeToWindow(win, "No match", row+indexPosition, columnStatus, lineColor, colors.red, true, true)
         end
 
         row = row + 1
@@ -359,6 +463,7 @@ local function displayItems()
     end
 
     saveSettings("prevAvailableAmounts", prevAvailableAmounts)
+    --btnCount:draw()
     term.redirect(term.native())
 
 end
@@ -368,7 +473,7 @@ local function drawUI()
     -- clearMonitor()
 
     -- Draws the buttons
-    btnInstance:draw()  
+    --btnInstance:draw(monitor)
 
     -- Draws the frame and the title of the program
     drawBox(2, winX - 1, 2, winY - 5, "Autostonking v2", colors.lightBlue, colors.blue)
@@ -381,8 +486,8 @@ local function drawUI()
 
 end
 
-btnInstance:add("Move list up", function() repositionWindow("up") end, 2, winY - 3, math.floor(winX / 2) - 1, winY - 1, colors.yellow, colors.yellow, colors.black, colors.black)
-btnInstance:add("Move list down", function() repositionWindow("down") end, math.floor(winX / 2) + 2, winY - 3, winX - 1, winY - 1, colors.yellow, colors.yellow, colors.black, colors.black)
+--btnInstance:add(monitor,"listUp","Move list up", function() repositionWindow("up") end, 2, winY - 3, math.floor(winX / 2) - 1, winY - 1, colors.yellow, colors.yellow, colors.black, colors.black)
+--btnInstance:add(monitor,"listDown","Move list down", function() repositionWindow("down") end, math.floor(winX / 2) + 2, winY - 3, winX - 1, winY - 1, colors.yellow, colors.yellow, colors.black, colors.black)
 
 local commands = {
     update = {
@@ -585,6 +690,17 @@ local function handleButtonEvents()
     end
 end
 
+-- Function to handle button events
+local function handleChangeButtonEvents()
+    while true do
+    -- Handle button events
+    local event = {btnCount:handleEvents(os.pullEvent())}
+        if event[1] == "button_click" then
+            btnCount.buttonList[event[2]].func()
+        end
+    end
+end
+
 -- Function to read user inputs
 local function inputLoop()
     while true do
@@ -594,4 +710,5 @@ local function inputLoop()
 end
 
 -- Run the main program and other required functions in a loop
-parallel.waitForAll(mainLoop, inputLoop, handleButtonEvents)
+--parallel.waitForAll(mainLoop, inputLoop, handleButtonEvents, handleChangeButtonEvents)
+parallel.waitForAll(mainLoop, inputLoop)
