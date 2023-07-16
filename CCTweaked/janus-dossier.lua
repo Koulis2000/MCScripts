@@ -5,7 +5,7 @@ require('janus/commands') 	-- Note that this is not commands = require('janus/co
 									-- The reason is that janus/commands.lua defines the global
 									-- variable commands when it is required. Since it is global,
 									-- it is available from this file as well.
-
+local janus = require('libjanus')
 if not commands then -- Checking that janus/commands.lua managed to define itself
 	-- If not, the program still runs, but commands won't work
 	print("Commands not defined!")
@@ -49,36 +49,18 @@ local function getInventory()
 	return nil
 end
 
--- Save function
-function save(file, data)
-	local fileName = "janus/" .. file
-	local serialisedData = textutils.serialise(data)
-	local file = fs.open(fileName, "w")
-	file.write(serialisedData)
-	file.close()
-end
--- Load function
-function load(file)
-	local fileName = "janus/" .. file
-	if not fs.exists(fileName) then
-		error("File " .. fileName .. " does not exist!")
-	end
-	local file = fs.open(fileName, "r")
-	local serialisedData = file.readAll()
-	file.close()
-	local data = textutils.unserialize(serialisedData)
-	return data
-end
-
 -- Function that definitelly needs optimization
 local function updateMeItems()
 	-- Update the meItems table with information from the ME network
 	print("Loading requestedItems...")
-	local requestedItems = load("requestedItems.tmp")
+	local requestedItems = janus.load("requestedItems.tmp")
+	print("\t" .. #requestedItems .. " items requested.")
 	print("Updating list of items in ME network...")
 	local meItemList = meBridge.listItems()
+	print("\t" .. #meItemList .. " items in ME network.")
 	print("Updating list of craftable items in ME network...")
 	local craftableItems = meBridge.listCraftableItems()
+	print("\t" .. #craftableItems .. " items craftable by ME network.")
 
 	-- Helper function to extract the last word from a string
 	local function getLastWord(str)
@@ -90,15 +72,15 @@ local function updateMeItems()
 	local groupedItems = {}
 
 	-- Group items by their last word
-	for _, meItem in pairs(requestedItems) do
-		local displayName = meItem[nameConstant]
+	for _, requestedItem in pairs(requestedItems) do
+		local displayName = requestedItem[nameConstant]
 		local lastWord = getLastWord(displayName)
 
 		if not groupedItems[lastWord] then
 			groupedItems[lastWord] = {}
 		end
 
-		table.insert(groupedItems[lastWord], meItem)
+		table.insert(groupedItems[lastWord], requestedItem)
 	end
 	print("Sorting items alphabetically within their respective groups...")
 	-- Sort items within each group alphabetically
@@ -117,29 +99,30 @@ local function updateMeItems()
 	end
 	print("Updating information about requested and craftable items...")
 	-- Update the item information
-	for _, meItem in pairs(requestedItems) do
-		local displayName = meItem[nameConstant]
-	-- Check if the item is available in the ME Items list and get the details
-		for _, listItem in pairs(meItemList) do
-			if string.lower(listItem.displayName) == string.lower(displayName) then
-				meItem[idConstant] = listItem.name
-				meItem[fingerprintConstant] = listItem.fingerprint
-				meItem[craftableConstant] = listItem.isCraftable
-				break
-			end
-		end
+	for _, requestedItem in pairs(requestedItems) do
+		local displayName = requestedItem[nameConstant]
 		-- Check if the item is available in the ME Craftable Items list and get the details
 		for _, craftableItem in pairs(craftableItems) do
 			if string.lower(craftableItem.displayName) == string.lower(displayName) then
-				meItem[idConstant] = craftableItem.name
-				meItem[fingerprintConstant] = craftableItem.fingerprint
-				meItem[craftableConstant] = craftableItem.isCraftable
+				requestedItem[idConstant] = craftableItem.name
+				requestedItem[fingerprintConstant] = craftableItem.fingerprint
+				requestedItem[craftableConstant] = craftableItem.isCraftable
+				break
+			end
+		end
+		-- Check if the item is available in the ME Items list and get the details
+		for _, listItem in pairs(meItemList) do
+			if string.lower(listItem.displayName) == string.lower(displayName) then
+				requestedItem[idConstant] = listItem.name
+				requestedItem[fingerprintConstant] = listItem.fingerprint
+				requestedItem[craftableConstant] = listItem.isCraftable
+				requestedItem['available'] = listItem.amount
 				break
 			end
 		end
 	end
-	print("Saving requested items...")
-	save("requestedItems.tmp", requestedItems)
+	print("Saving " .. #requestedItems .. " requested items...")
+	janus.save("requestedItems.tmp", requestedItems)
 end
 
 -- Function to remove an item from the meItems list in the settings based on Display Name

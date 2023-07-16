@@ -5,6 +5,8 @@ local countConstant = 3
 local nameConstant = 4
 local craftableConstant = 5
 
+local janus = require('../libjanus')
+
 commands = {
     update = {
         description = "Update the requestedItems list with items from the adjacent inventory",
@@ -17,7 +19,7 @@ commands = {
         description = "Add items to the requestedItems list",
         handler = function(...)
             local args = {...}
-            local requestedItems = load("requestedItems.tmp")
+            local requestedItems = janus.load("requestedItems.tmp")
 
             if args[1] == "inventory" then
                 if isInventory() then
@@ -44,7 +46,7 @@ commands = {
                         end
                     end
 
-                    save("requestedItems.tmp", requestedItems)
+                    janus.save("requestedItems.tmp", requestedItems)
                     print("Inventory items added successfully")
                 end
             else
@@ -77,7 +79,7 @@ commands = {
                 end
             end
 
-            save("requestedItems.tmp", requestedItems)
+            janus.save("requestedItems.tmp", requestedItems)
             print("List updated!")
         end
     },
@@ -86,7 +88,7 @@ commands = {
         description = "Modify the 'min' value for item(s) in the meItems list",
         handler = function(...)
             local args = {...}
-            local requestedItems = load("requestedItems.tmp")
+            local requestedItems = janus.load("requestedItems.tmp")
 
             -- Check if the arguments contain index numbers and the new 'min' value
             local indexNumbers = {}
@@ -119,7 +121,7 @@ commands = {
                         print("Invalid index number: " .. index)
                     end
                 end
-                save("requestedItems.tmp", requestedItems)
+                janus.save("requestedItems.tmp", requestedItems)
             else
                 print("Please provide the index number(s) of the item(s) to modify")
             end
@@ -130,7 +132,7 @@ commands = {
         description = "Remove item(s) from the meItems list",
         handler = function(...)
             local args = {...}
-            local requestedItems = load("requestedItems.tmp")
+            local requestedItems = janus.load("requestedItems.tmp")
 
             -- Check if the arguments contain index numbers
             local indexNumbers = {}
@@ -166,7 +168,7 @@ commands = {
                     removeItem(displayName)
                 end
             end
-            save("requestedItems.tmp", requestedItems)
+            janus.save("requestedItems.tmp", requestedItems)
         end
     },
 }

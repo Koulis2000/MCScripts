@@ -34,8 +34,6 @@ local craftableConstant = 5
 print("Initialising Waltz...")
 print("\tDetecting monitor...")
 local monitor = peripheral.find("monitor")
-local resolution = monitor.getSize()
-print("\tResolution: " .. inspect(resolution))
 print("\tRedirecting terminal...")
 term.redirect(monitor)
 print("\t\tApplying CC/OC compatibility patch...")
@@ -86,10 +84,13 @@ local function printStatus(status)
 end
 
 -- Initialise arrays for holding components
+	-- This should be done like the panels, below, instead, probably...
 printStatus("Initialising component holding arrays...")
 local lblsDisplayName = {}
 local lblsAvailableQuantity = {}
 local lblsRequestedQuantity = {}
+local btnsPlus = {}
+local btnsMinus = {}
 
 printStatus("Starting Janus Dossier (if not running)...")
 local dossierProcessID = nil
@@ -107,6 +108,10 @@ if dossierProcessID == nil then
 	error("Could not get process ID of Janus Dossier! Perhaps you are trying to run on a normal Computer? Janus requires an Advanced Computer.")
 end
 
+printStatus("Changing own tab title to Janus Lens")
+local processID = multishell.getCurrent()
+multishell.setTitle(processID, 'Janus Lens')
+
 printStatus("Initialising panels...")
 local panels = {
 	pnlDisplayName = Panel.create(g, "Name", 1, 3, 50, sizeY - 4, true),
@@ -114,30 +119,32 @@ local panels = {
 	pnlRequestedQuantity = Panel.create(g, "Requested", 76, 3, 25, sizeY - 4, true)
 }
 for _, p in pairs(panels) do
+	print("\tPanel " .. p:getTitle() .. " added.")
 	g:addComponent(p)
 end
 
 
 setStatus("Starting.....")
 write("Initialisation complete! Starting")
-for i = 4, 0, -1 do
+for i = 4, 0, -1 do -- Make it a slow start to allow janus-dossier time for its first update, in case it wasn't running
 	write(".")
 	sleep(1)
 end
 
 function main()
-	--do things
+	-- Do things
 	updateInfo()
+	-- Get some sleep
 	sleep(5)
 end
 
 function updateInfo()
-	local x = sizeX
 	setStatus("Updating info...")
 	local requestedItems = janus.load('requestedItems.tmp')
-	for k, v in ipairs(requestedItems) do
+	for k, v in ipairs(requestedItems) do -- Iterate over requestedItems. The key (index) goes in k, the value (item) goes in v
+		--ipairs() because we want to preserve the order of the list
 		local displayName = v[nameConstant]
-		local availableQuantity = "Soon™"
+		local availableQuantity = v['available']
    	local requestedQuantity = v[countConstant]
 		if not lblsDisplayName[k] then
 			lblsDisplayName[k] = Label.create(g, displayName, theme['textForegroundColour'], theme['textBackgroundColour'], 1, k, 25, 1)
@@ -152,12 +159,21 @@ function updateInfo()
 			lblsAvailableQuantity[k]:setText(availableQuantity)
 		end
 		if not lblsRequestedQuantity[k] then
-			lblsRequestedQuantity[k] = Label.create(g, requestedQuantity, theme['textForegroundColour'], theme['textBackgroundColour'], 1, k, 7, 1)
+			lblsRequestedQuantity[k] = Label.create(g, requestedQuantity, theme['textForegroundColour'], theme['textBackgroundColour'], 3, k, 7, 1)
 			panels.pnlRequestedQuantity:addComponent(lblsRequestedQuantity[k])
 		else
 			lblsRequestedQuantity[k]:setText(requestedQuantity)
 		end
+		if not btnsMinus[k] then
+			btnsMinus[k] = Button.create(g, "-", theme['failureForegroundColour'], theme['failureBackgroundColour'], 1, k, 1, 1)
+			panels.pnlRequestedQuantity:addComponent(btnsMinus[k])
+		end
+		if not btnsPlus[k] then
+			btnsPlus[k] = Button.create(g, "+", theme['successForegroundColour'], theme['successBackgroundColour'], 11, k, 1, 1)
+			panels.pnlRequestedQuantity:addComponent(btnsPlus[k])
+		end
 	end
+	setStatus("Updated info.")
 end
 
 
