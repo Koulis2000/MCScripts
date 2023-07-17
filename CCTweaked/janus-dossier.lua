@@ -52,16 +52,24 @@ local function getInventory()
 	return nil
 end
 
+local craftableItems = nil -- When the program runs, craftableItems is initialised to nil
+local function getCraftableItems() -- This function delaggifies listCraftableItems() by running it only once per program start
+	if craftableItems == nil then -- If it is still nil, run the laggy function to make it not nil
+		print("\tUpdating list...")
+		craftableItems = meBridge.listCraftableItems()
+	end
+	return craftableItems -- Return the result
+end
+
 -- Function that definitely needs optimization
 local function updateRequestedItems()
 	-- Update the requested items table with information from the ME network
 	print("Loading requestedItems...")
 	local requestedItems = janus.load("requestedItems.tmp")
 	print("\t" .. #requestedItems .. " items requested.")
-	print("Updating list of craftable items in ME network...")
-	local craftableItems = meBridge.listCraftableItems()
+	print("Getting list of craftable items in ME network...")
+	local craftableItems = getCraftableItems()
 	print("\t" .. #craftableItems .. " items craftable by ME network.")
-	janus.nap(60)
 	print("Updating list of items in ME network...")
 	local meItemList = meBridge.listItems()
 	print("\t" .. #meItemList .. " items in ME network.")
