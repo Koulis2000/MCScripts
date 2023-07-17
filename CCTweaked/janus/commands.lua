@@ -1,9 +1,12 @@
 -- Define constants
 local idConstant = 1
 local fingerprintConstant = 2
-local countConstant = 3
+local requestedQuantityConstant = 3
 local nameConstant = 4
 local craftableConstant = 5
+local pausedConstant = 6
+local statusConstant = 7
+local countConstant = 8
 
 local janus = require('../libjanus')
 
@@ -11,7 +14,7 @@ commands = {
     update = {
         description = "Update the requestedItems list with items from the adjacent inventory",
         handler = function()
-            updateMeItems()
+            updateRequestedItems()
             print("Inventory updated successfully")
         end
     },
@@ -75,7 +78,7 @@ commands = {
                     table.insert(requestedItems, {"", "", stockAmount, displayName, false})
                     print("Item '" .. displayName .. "' added with stock amount: " .. stockAmount)
                 else
-                    print("Item '" .. displayName .. "' already exists in the meItems list")
+                    print("Item '" .. displayName .. "' already exists in the requested items list")
                 end
             end
 
@@ -85,7 +88,7 @@ commands = {
     },
 
     modify = {
-        description = "Modify the 'min' value for item(s) in the meItems list",
+        description = "Modify the 'min' value for item(s) in the requested items list",
         handler = function(...)
             local args = {...}
             local requestedItems = janus.load("requestedItems.tmp")
@@ -111,11 +114,11 @@ commands = {
 
             -- Check if index numbers are present
             if #indexNumbers > 0 then
-                -- Modify the 'min' value for items in the meItems list using the index numbers
+                -- Modify the 'min' value for items in the requested items list using the index numbers
                 for _, index in ipairs(indexNumbers) do
                     if index >= 1 and index <= #requestedItems then -- Check if index is within bounds :thumbsup:
                         local item = requestedItems[index]
-                        item[countConstant] = newMinValue
+                        item[requestedQuantityConstant] = newMinValue
                         print("Modified 'min' value for item at index " .. index)
                     else
                         print("Invalid index number: " .. index)
@@ -127,9 +130,9 @@ commands = {
             end
         end
     },
-
-    remove = {
-        description = "Remove item(s) from the meItems list",
+    
+    pause = {
+        description = "Pause item(s) in the requested items list",
         handler = function(...)
             local args = {...}
             local requestedItems = janus.load("requestedItems.tmp")
@@ -145,29 +148,113 @@ commands = {
 
             -- Check if index numbers are present
             if #indexNumbers > 0 then
-            -- Sort the index numbers in descending order to ensure correct removal
-            -- obamanotbad.svg
-            table.sort(indexNumbers, function(a, b) return a > b end)
-
-            -- Remove items from the meItems list using the index numbers
-            for _, index in ipairs(indexNumbers) do
-                if index >= 1 and index <= #requestedItems then
-                    local removedItem = table.remove(requestedItems, index)
-                    print("Item '" .. removedItem[nameConstant] .. "' removed successfully")
+                -- Set the 'pausedConstant' to true for items in the requested items list using the index numbers
+                for _, index in ipairs(indexNumbers) do
+                    if index >= 1 and index <= #requestedItems then
+                        local item = requestedItems[index]
+                        item[pausedConstant] = true
+                        print("Item '" .. item[nameConstant] .. "' paused successfully")
+                    else
+                        print("Invalid index number: " .. index)
+                    end
+                end
+                janus.save("requestedItems.tmp", requestedItems)
+            else
+                -- No index numbers provided, treat the arguments as the display name
+                local displayName = table.concat(args, " ")
+                if displayName == "" then
+                    print("Please provide the display name or index number(s) of the item(s) to pause")
                 else
-                    print("Invalid index number: " .. index)
+                    pauseItem(displayName)
+                end
+            end
+        end
+    },
+
+    unpause = {
+        description = "Unpause item(s) in the requested items list",
+        handler = function(...)
+            local args = {...}
+            local requestedItems = janus.load("requestedItems.tmp")
+
+            -- Check if the arguments contain index numbers
+            local indexNumbers = {}
+            for _, arg in ipairs(args) do
+                local index = tonumber(arg)
+                if index then
+                    table.insert(indexNumbers, index)
                 end
             end
 
+            -- Check if index numbers are present
+            if #indexNumbers > 0 then
+                -- Set the 'pausedConstant' to false for items in the requested items list using the index numbers
+                for _, index in ipairs(indexNumbers) do
+                    if index >= 1 and index <= #requestedItems then
+                        local item = requestedItems[index]
+                        item[pausedConstant] = false
+                        print("Item '" .. item[nameConstant] .. "' unpaused successfully")
+                    else
+                        print("Invalid index number: " .. index)
+                    end
+                end
+                janus.save("requestedItems.tmp", requestedItems)
             else
-            -- No index numbers provided, treat the arguments as the display name
-            local displayName = table.concat(args, " ")
+                -- No index numbers provided, treat the arguments as the display name
+                local displayName = table.concat(args, " ")
+                if displayName == "" then
+                    print("Please provide the display name or index number(s) of the item(s) to pause")
+                else
+                    pauseItem(displayName)
+                end
+            end
+        end
+    },
+
+    remove = {
+        description = "Remove item(s) from the requested items list",
+        handler = function(...)
+            local args = {...}
+            local requestedItems = janus.load("requestedItems.tmp")
+
+            -- Helper function to remove items based on indexes
+            local function removeItemsByIndexes(indexNumbers)
+                -- Sort the index numbers in descending order to ensure correct removal
+                table.sort(indexNumbers, function(a, b) return a > b end)
+
+                -- Remove items from the requestedItems list using the index numbers
+                for _, index in ipairs(indexNumbers) do
+                    if index >= 1 and index <= #requestedItems then
+                        local removedItem = table.remove(requestedItems, index)
+                        print("Item '" .. removedItem[nameConstant] .. "' removed successfully")
+                    else
+                        print("Invalid index number: " .. index)
+                    end
+                end
+            end
+
+            -- Check if the arguments contain index numbers
+            local indexNumbers = {}
+            for _, arg in ipairs(args) do
+                local index = tonumber(arg)
+                if index then
+                    table.insert(indexNumbers, index)
+                end
+            end
+
+            -- Check if index numbers are present
+            if #indexNumbers > 0 then
+                removeItemsByIndexes(indexNumbers)
+            else
+                -- No index numbers provided, treat the arguments as the display name
+                local displayName = table.concat(args, " ")
                 if displayName == "" then
                     print("Please provide the display name or index number(s) of the item(s) to remove")
                 else
                     removeItem(displayName)
                 end
             end
+
             janus.save("requestedItems.tmp", requestedItems)
         end
     },

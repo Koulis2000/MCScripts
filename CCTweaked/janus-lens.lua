@@ -26,9 +26,12 @@ local winButtons = {}
 -- Define constants
 local idConstant = 1
 local fingerprintConstant = 2
-local countConstant = 3
+local requestedQuantityConstant = 3
 local nameConstant = 4
 local craftableConstant = 5
+local pausedConstant = 6
+local statusConstant = 7
+local countConstant = 8
 
 -- Initialise Waltz
 print("Initialising Waltz...")
@@ -89,6 +92,7 @@ printStatus("Initialising component holding arrays...")
 local lblsDisplayName = {}
 local lblsAvailableQuantity = {}
 local lblsRequestedQuantity = {}
+local lblsStatus = {}
 local btnsPlus = {}
 local btnsMinus = {}
 
@@ -113,10 +117,16 @@ local processID = multishell.getCurrent()
 multishell.setTitle(processID, 'Janus Lens')
 
 printStatus("Initialising panels...")
+local slices = 12
+local column1 = math.floor(sizeX * 5 / slices)
+local column2 = math.floor(sizeX * 2 / slices)+1
+local column3 = math.floor(sizeX * 2 / slices)+1
+local column4 = math.floor(sizeX * 3 / slices)
 local panels = {
-	pnlDisplayName = Panel.create(g, "Name", 1, 3, 50, sizeY - 4, true),
-	pnlAvailableQuantity = Panel.create(g, "Available", 51, 3, 25, sizeY - 4, true),
-	pnlRequestedQuantity = Panel.create(g, "Requested", 76, 3, 25, sizeY - 4, true)
+	pnlDisplayName = Panel.create(g, "Name", 1, 3, column1, sizeY - 4, true),
+	pnlAvailableQuantity = Panel.create(g, "Available", column1+1, 3, column2, sizeY - 4, true),
+	pnlRequestedQuantity = Panel.create(g, "Requested", column1+column2+1, 3, column3, sizeY - 4, true),
+	pnlStatus = Panel.create(g, "Status", column1+column2+column3+1, 3, column4, sizeY - 4, true),
 }
 for _, p in pairs(panels) do
 	print("\tPanel " .. p:getTitle() .. " added.")
@@ -145,7 +155,8 @@ function updateInfo()
 		--ipairs() because we want to preserve the order of the list
 		local displayName = v[nameConstant]
 		local availableQuantity = v['available']
-   	local requestedQuantity = v[countConstant]
+   	local requestedQuantity = v[requestedQuantityConstant]
+   	local status = v[statusConstant]
 		if not lblsDisplayName[k] then
 			lblsDisplayName[k] = Label.create(g, displayName, theme['textForegroundColour'], theme['textBackgroundColour'], 1, k, 25, 1)
 			panels.pnlDisplayName:addComponent(lblsDisplayName[k])
@@ -163,6 +174,12 @@ function updateInfo()
 			panels.pnlRequestedQuantity:addComponent(lblsRequestedQuantity[k])
 		else
 			lblsRequestedQuantity[k]:setText(requestedQuantity)
+		end
+		if not lblsStatus[k] then
+			lblsStatus[k] = Label.create(g, status, theme['textForegroundColour'], theme['textBackgroundColour'], 3, k, 7, 1)
+			panels.pnlStatus:addComponent(lblsStatus[k])
+		else
+			lblsStatus[k]:setText(status)
 		end
 		if not btnsMinus[k] then
 			btnsMinus[k] = Button.create(g, "-", theme['failureForegroundColour'], theme['failureBackgroundColour'], 1, k, 1, 1)

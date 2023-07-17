@@ -14,9 +14,12 @@ end
 -- Define constants
 local idConstant = 1
 local fingerprintConstant = 2
-local countConstant = 3
+local requestedQuantityConstant = 3
 local nameConstant = 4
 local craftableConstant = 5
+local pausedConstant = 6
+local statusConstant = 7
+local countConstant = 8
 
 -- Define global variables
 local programName = "ME Autocraft"
@@ -49,9 +52,9 @@ local function getInventory()
 	return nil
 end
 
--- Function that definitelly needs optimization
-local function updateMeItems()
-	-- Update the meItems table with information from the ME network
+-- Function that definitely needs optimization
+local function updateRequestedItems()
+	-- Update the requested items table with information from the ME network
 	print("Loading requestedItems...")
 	local requestedItems = janus.load("requestedItems.tmp")
 	print("\t" .. #requestedItems .. " items requested.")
@@ -89,8 +92,8 @@ local function updateMeItems()
 			return a[nameConstant] < b[nameConstant]
 			end)
 	end
-	print("Flattening resulting table back into meItems table...")
-	-- Flatten the grouped items back into the meItems table
+	print("Flattening resulting table back into requested items table...")
+	-- Flatten the grouped items back into the requested items table
 	requestedItems = {}
 	for _, group in pairs(groupedItems) do
 		for _, item in pairs(group) do
@@ -103,48 +106,141 @@ local function updateMeItems()
 		local displayName = requestedItem[nameConstant]
 		-- Check if the item is available in the ME Craftable Items list and get the details
 		for _, craftableItem in pairs(craftableItems) do
+			requestedItem[statusConstant] = "Not available"
 			if string.lower(craftableItem.displayName) == string.lower(displayName) then
 				requestedItem[idConstant] = craftableItem.name
 				requestedItem[fingerprintConstant] = craftableItem.fingerprint
 				requestedItem[craftableConstant] = craftableItem.isCraftable
+				requestedItem[countConstant] = craftableItem.amount or 0
+				requestedItem[statusConstant] = "Available"
 				break
 			end
 		end
-		-- Check if the item is available in the ME Items list and get the details
+		-- Check if the item is available in the ME items list and get the details
 		for _, listItem in pairs(meItemList) do
+			requestedItem[statusConstant] = "No match"
 			if string.lower(listItem.displayName) == string.lower(displayName) then
 				requestedItem[idConstant] = listItem.name
 				requestedItem[fingerprintConstant] = listItem.fingerprint
 				requestedItem[craftableConstant] = listItem.isCraftable
-				requestedItem['available'] = listItem.amount
+				requestedItem[countConstant] = listItem.amount or 0
+				requestedItem[statusConstant] = "Match"	
 				break
 			end
 		end
 	end
+
 	print("Saving " .. #requestedItems .. " requested items...")
 	janus.save("requestedItems.tmp", requestedItems)
 end
 
--- Function to remove an item from the meItems list in the settings based on Display Name
+-- Helper function to find an item index by Display Name
+local function finditemIndex(requestedItems, displayName)
+    for i, requestedItem in pairs(requestedItems) do
+        if item[nameConstant] == displayName then
+            return i
+        end
+    end
+    return nil
+end
+
+-- Function to pause an item in the requested items list in the settings based on Display Name
+local function pauseItem(displayName)
+    local requestedItems = janus.load("requestedItems.tmp")
+    local itemIndex = finditemIndex(requestedItems, displayName)
+
+    if itemIndex then
+        requestedItems[itemIndex][pausedConstant] = true
+        print("Item '" .. displayName .. "' paused successfully")
+    else
+        print("Item '" .. displayName .. "' not found in the requested items list")
+    end
+
+    janus.save("requestedItems.tmp", requestedItems)
+end
+
+-- Function to unpause an item in the requested items list in the settings based on Display Name
+local function unpauseItem(displayName)
+    local requestedItems = janus.load("requestedItems.tmp")
+    local itemIndex = finditemIndex(requestedItems, displayName)
+
+    if itemIndex then
+        requestedItems[itemIndex][pausedConstant] = false
+        print("Item '" .. displayName .. "' unpaused successfully")
+    else
+        print("Item '" .. displayName .. "' not found in the requested items list")
+    end
+
+    janus.save("requestedItems.tmp", requestedItems)
+end
+
+-- Function to remove an item from the requested items list in the settings based on Display Name
 local function removeItem(displayName)
-	local meItems = loadSettings("meItems")
-	local itemIndex = nil
+    local requestedItems = janus.load("requestedItems.tmp")
+    local itemIndex = finditemIndex(requestedItems, displayName)
 
-	for i, item in ipairs(meItems) do
-		if item[nameConstant] == displayName then
-			itemIndex = i
-			break
-		end
-	end
+    if itemIndex then
+        table.remove(requestedItems, itemIndex)
+        print("Item '" .. displayName .. "' removed successfully")
+    else
+        print("Item '" .. displayName .. "' not found in the requested items list")
+    end
 
-	if itemIndex then
-		table.remove(meItems, itemIndex)
-		print("Item '" .. displayName .. "' removed successfully")
-	else
-		print("Item '" .. displayName .. "' not found in the meItems list")
-	end
+    janus.save("requestedItems.tmp", requestedItems)
+end
 
-	saveSettings("meItems", meItems)
+-- Function to craft items to match the requested amounts
+local function craftCycle()
+    local requestedItems = janus.load("requestedItems.tmp")
+
+    for i, requestedItem in pairs(requestedItems) do
+        local name = requestedItem[idConstant]
+        local fingerprint = requestedItem[fingerprintConstant]
+        local craftable = requestedItem[craftableConstant]
+        local requestedQuantity = requestedItem[requestedQuantityConstant]
+        local displayName = requestedItem[nameConstant]
+        local count = requestedItem[countConstant]
+        local paused = requestedItem[pausedConstant] or false
+
+        local displayText = string.format("%d. %s", i, displayName)
+
+        if not paused then
+            -- Reset the status message for each item
+            requestedItem[statusConstant] = ""
+
+            if count < requestedQuantity then
+                if craftable then
+                    if not craftable then
+                        local craftedItem = { name = name, count = requestedQuantity - count }
+                        meBridge.craftItem(craftedItem)
+                        requestedItem[statusConstant] = "Attempting to craft..."
+                    elseif meBridge.isItemCrafting({ name = name }) then
+                        requestedItem[statusConstant] = "Crafting..."
+                    end
+                elseif not craftable then
+                    requestedItem[statusConstant] = "Not craftable :("
+                end
+            elseif count >= requestedQuantity then
+                local ratio = count / requestedQuantity
+                if ratio <= 1.1 then
+                    requestedItem[statusConstant] = "Stonked!"
+                elseif ratio <= 2 then
+                    requestedItem[statusConstant] = "Doublestonked!"
+                elseif ratio <= 3 then
+                    requestedItem[statusConstant] = "T-T-T-TRIPLESTONKED!"
+                elseif count == 0 and requestedQuantity == 0 then
+                    requestedItem[statusConstant] = "No stock but, no need?"
+                elseif count > requestedQuantity and requestedQuantity == 0 then
+                    requestedItem[statusConstant] = "Stonked but, no need?"
+                else
+                    requestedItem[statusConstant] = "Why's on the list?!"
+                end
+            end
+	    else
+	    	requestedItem[statusConstant] = "Paused"
+	    end
+    end
+    janus.save("requestedItems.tmp", requestedItems)
 end
 
 -- Function to process user commands
@@ -166,7 +262,8 @@ end
 -- Main program loop
 local function mainLoop()
 	while true do
-		updateMeItems()
+		updateRequestedItems()
+		craftCycle()
 		print("Resting for 60 seconds")
 		for i = 60, 0, -1 do
 			sleep(1)
