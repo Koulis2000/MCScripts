@@ -58,12 +58,13 @@ local function updateRequestedItems()
 	print("Loading requestedItems...")
 	local requestedItems = janus.load("requestedItems.tmp")
 	print("\t" .. #requestedItems .. " items requested.")
-	print("Updating list of items in ME network...")
-	local meItemList = meBridge.listItems()
-	print("\t" .. #meItemList .. " items in ME network.")
 	print("Updating list of craftable items in ME network...")
 	local craftableItems = meBridge.listCraftableItems()
 	print("\t" .. #craftableItems .. " items craftable by ME network.")
+	janus.nap(60)
+	print("Updating list of items in ME network...")
+	local meItemList = meBridge.listItems()
+	print("\t" .. #meItemList .. " items in ME network.")
 
 	-- Helper function to extract the last word from a string
 	local function getLastWord(str)
@@ -264,10 +265,7 @@ local function mainLoop()
 	while true do
 		updateRequestedItems()
 		craftCycle()
-		print("Resting for 60 seconds")
-		for i = 60, 0, -1 do
-			sleep(1)
-		end
+		janus.nap(60)
 	end
 end
 

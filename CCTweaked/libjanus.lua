@@ -56,4 +56,11 @@ function janus.load(file)
 	return data -- Return it
 end
 
+function janus.nap(t)
+	print("Resting for " .. t .. " seconds.")
+	for i = t, 0, -1 do
+		sleep(1)
+	end
+end
+
 return janus
