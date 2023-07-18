@@ -1,13 +1,3 @@
--- Define constants
-local idConstant = 1
-local fingerprintConstant = 2
-local requestedQuantityConstant = 3
-local nameConstant = 4
-local craftableConstant = 5
-local pausedConstant = 6
-local statusConstant = 7
-local countConstant = 8
-
 local janus = require('../libjanus')
 
 commands = {
@@ -142,46 +132,62 @@ commands = {
             end
         end
     },
-    
+
     pause = {
         description = "Pause item(s) in the requested items list",
         handler = function(...)
             local args = {...}
             local requestedItems = janus.load("requestedItems.tmp")
 
-            -- Check if the arguments contain index numbers
+            -- Check if the arguments contain index numbers or "all"
             local indexNumbers = {}
+            local pauseAll = false
             for _, arg in ipairs(args) do
+                if arg == "all" then
+                    pauseAll = true
+                    break
+                end
+
                 local index = tonumber(arg)
                 if index then
                     table.insert(indexNumbers, index)
                 end
             end
 
-            -- Check if index numbers are present
-            if #indexNumbers > 0 then
-                -- Set the 'pausedConstant' to true for items in the requested items list using the index numbers
-                for _, index in ipairs(indexNumbers) do
-                    if index >= 1 and index <= #requestedItems then
-                        local item = requestedItems[index]
-                        item['paused'] = true
-                        print("Item '" .. item['name'] .. "' paused successfully")
+            -- If "all" is provided, pause all items
+            if pauseAll then
+                for _, item in ipairs(requestedItems) do
+                    item['paused'] = true
+                end
+                print("All items paused with no exception!")
+            else
+                -- Check if index numbers are present
+                if #indexNumbers > 0 then
+                    -- Set the 'paused' key to true for items in the requested items list using the index numbers
+                    for _, index in ipairs(indexNumbers) do
+                        if index >= 1 and index <= #requestedItems then
+                            local item = requestedItems[index]
+                            item['paused'] = true
+                            print("Item '" .. item['name'] .. "' paused successfully")
+                        else
+                            print("Invalid index number: " .. index)
+                        end
+                    end
+                else
+                    -- No index numbers provided, treat the arguments as the display name
+                    local displayName = table.concat(args, " ")
+                    if displayName == "" then
+                        print("Please provide the display name or index number(s) of the item(s) to pause")
                     else
-                        print("Invalid index number: " .. index)
+                        pauseItem(displayName)
                     end
                 end
-                janus.save("requestedItems.tmp", requestedItems)
-            else
-                -- No index numbers provided, treat the arguments as the display name
-                local displayName = table.concat(args, " ")
-                if displayName == "" then
-                    print("Please provide the display name or index number(s) of the item(s) to pause")
-                else
-                    pauseItem(displayName)
-                end
             end
+
+            janus.save("requestedItems.tmp", requestedItems)
         end
     },
+
 
     unpause = {
         description = "Unpause item(s) in the requested items list",
@@ -189,37 +195,52 @@ commands = {
             local args = {...}
             local requestedItems = janus.load("requestedItems.tmp")
 
-            -- Check if the arguments contain index numbers
+            -- Check if the arguments contain index numbers or "all"
             local indexNumbers = {}
+            local unpauseAll = false
             for _, arg in ipairs(args) do
+                if arg == "all" then
+                    unpauseAll = true
+                    break
+                end
+
                 local index = tonumber(arg)
                 if index then
                     table.insert(indexNumbers, index)
                 end
             end
 
-            -- Check if index numbers are present
-            if #indexNumbers > 0 then
-                -- Set the 'pausedConstant' to false for items in the requested items list using the index numbers
-                for _, index in ipairs(indexNumbers) do
-                    if index >= 1 and index <= #requestedItems then
-                        local item = requestedItems[index]
-                        item['paused'] = false
-                        print("Item '" .. item['name'] .. "' unpaused successfully")
+            -- If "all" is provided, unpause all items
+            if unpauseAll then
+                for _, item in ipairs(requestedItems) do
+                    item['paused'] = false
+                end
+                print("All items unpaused with no exception!")
+            else
+                -- Check if index numbers are present
+                if #indexNumbers > 0 then
+                    -- Set the 'pause' to false for items in the requested items list using the index numbers
+                    for _, index in ipairs(indexNumbers) do
+                        if index >= 1 and index <= #requestedItems then
+                            local item = requestedItems[index]
+                            item['paused'] = false
+                            print("Item '" .. item['name'] .. "' paused successfully")
+                        else
+                            print("Invalid index number: " .. index)
+                        end
+                    end
+                else
+                    -- No index numbers provided, treat the arguments as the display name
+                    local displayName = table.concat(args, " ")
+                    if displayName == "" then
+                        print("Please provide the display name or index number(s) of the item(s) to pause")
                     else
-                        print("Invalid index number: " .. index)
+                        unpauseItem(displayName)
                     end
                 end
-                janus.save("requestedItems.tmp", requestedItems)
-            else
-                -- No index numbers provided, treat the arguments as the display name
-                local displayName = table.concat(args, " ")
-                if displayName == "" then
-                    print("Please provide the display name or index number(s) of the item(s) to pause")
-                else
-                    pauseItem(displayName)
-                end
             end
+
+            janus.save("requestedItems.tmp", requestedItems)
         end
     },
 

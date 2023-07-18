@@ -4,6 +4,16 @@ local inspect = require("inspect")
 local janus = require("libjanus")
 local waltz = require("waltz")
 
+-- Read commands definition file
+require('janus/commands') 	-- Note that this is not commands = require('janus/commands')
+									-- The reason is that janus/commands.lua defines the global
+									-- variable commands when it is required. Since it is global,
+									-- it is available from this file as well.
+if not commands then -- Checking that janus/commands.lua managed to define itself
+	-- If not, the program still runs, but commands won't work
+	print("Commands not defined!")
+end
+
 theme = {
    titleForegroundColour = 0x200,
    titleBackgroundColour = 0x80,
@@ -22,16 +32,6 @@ theme = {
 local sizeX, sizeY
 local w = nil
 local winButtons = {}
-
--- Define constants
-local idConstant = 1
-local fingerprintConstant = 2
-local requestedQuantityConstant = 3
-local nameConstant = 4
-local craftableConstant = 5
-local pausedConstant = 6
-local statusConstant = 7
-local countConstant = 8
 
 -- Initialise Waltz
 print("Initialising Waltz...")
@@ -95,6 +95,10 @@ local lblsRequestedQuantity = {}
 local lblsStatus = {}
 local btnsPlus = {}
 local btnsMinus = {}
+local btnPauseAll = nil
+local btnPause = nil
+local btnModify = nil
+local btnRemove = nil
 
 printStatus("Starting Janus Dossier (if not running)...")
 local dossierProcessID = nil
@@ -117,16 +121,18 @@ local processID = multishell.getCurrent()
 multishell.setTitle(processID, 'Janus Lens')
 
 printStatus("Initialising panels...")
-local slices = 12
+local slices = 17
 local column1 = math.floor(sizeX * 5 / slices)
-local column2 = math.floor(sizeX * 2 / slices)+1
-local column3 = math.floor(sizeX * 2 / slices)+1
-local column4 = math.floor(sizeX * 3 / slices)
+local column2 = math.floor(sizeX * 3 / slices)
+local column3 = math.floor(sizeX * 3 / slices)
+local column4 = math.floor(sizeX * 5 / slices)
+local column5 = math.floor(sizeX * 1 / slices)
 local panels = {
 	pnlDisplayName = Panel.create(g, "Name", 1, 3, column1, sizeY - 4, true),
 	pnlAvailableQuantity = Panel.create(g, "Available", column1+1, 3, column2, sizeY - 4, true),
 	pnlRequestedQuantity = Panel.create(g, "Requested", column1+column2+1, 3, column3, sizeY - 4, true),
-	pnlStatus = Panel.create(g, "Status", column1+column2+column3+1, 3, column4, sizeY - 4, true),
+	pnlStatus = Panel.create(g, "Status", column1+column2+column3+1, 3, column4-1, sizeY - 4, true),
+	pnlActions = Panel.create(g, "ACT", column1+column2+column3+column4+2, 3, column5, sizeY - 4, false),
 }
 for _, p in pairs(panels) do
 	print("\tPanel " .. p:getTitle() .. " added.")
@@ -145,7 +151,7 @@ function main()
 	-- Do things
 	updateInfo()
 	-- Get some sleep
-	sleep(5)
+	sleep(2)
 end
 
 function updateInfo()
@@ -157,40 +163,119 @@ function updateInfo()
 		local availableQuantity = v['storedQuantity']
    	local requestedQuantity = v['requestedQuantity']
    	local status = v['status']
+		
+		local displayText = string.format("%2d. %s", k, displayName)
+
+
 		if not lblsDisplayName[k] then
 			lblsDisplayName[k] = Label.create(g, displayName, theme['textForegroundColour'], theme['textBackgroundColour'], 1, k, 25, 1)
 			panels.pnlDisplayName:addComponent(lblsDisplayName[k])
 		else
-			lblsDisplayName[k]:setText(displayName)
+			lblsDisplayName[k]:setText(displayText)
 		end
 		if not lblsAvailableQuantity[k] then
-			lblsAvailableQuantity[k] = Label.create(g, availableQuantity, theme['textForegroundColour'], theme['textBackgroundColour'], 1, k, 7, 1)
+			lblsAvailableQuantity[k] = Label.create(g, availableQuantity, theme['textForegroundColour'], theme['textBackgroundColour'], 2, k, 7, 1)
 			panels.pnlAvailableQuantity:addComponent(lblsAvailableQuantity[k])
 		else 
+			lblsAvailableQuantity[k]:setText("")
 			lblsAvailableQuantity[k]:setText(availableQuantity)
 		end
 		if not lblsRequestedQuantity[k] then
-			lblsRequestedQuantity[k] = Label.create(g, requestedQuantity, theme['textForegroundColour'], theme['textBackgroundColour'], 3, k, 7, 1)
+			lblsRequestedQuantity[k] = Label.create(g, requestedQuantity, theme['textForegroundColour'], theme['textBackgroundColour'], 4, k, 7, 1)
 			panels.pnlRequestedQuantity:addComponent(lblsRequestedQuantity[k])
 		else
+			lblsRequestedQuantity[k]:setText("")
 			lblsRequestedQuantity[k]:setText(requestedQuantity)
 		end
 		if not lblsStatus[k] then
-			lblsStatus[k] = Label.create(g, status, theme['textForegroundColour'], theme['textBackgroundColour'], 3, k, 7, 1)
+			lblsStatus[k] = Label.create(g, status, theme['textForegroundColour'], theme['textBackgroundColour'], 2, k, 7, 1)
 			panels.pnlStatus:addComponent(lblsStatus[k])
 		else
+			lblsStatus[k]:setText("")
 			lblsStatus[k]:setText(status)
 		end
 		if not btnsMinus[k] then
-			btnsMinus[k] = Button.create(g, "-", theme['failureForegroundColour'], theme['failureBackgroundColour'], 1, k, 1, 1)
+			btnsMinus[k] = Button.create(g, "-", theme['failureForegroundColour'], theme['failureBackgroundColour'], 2, k, 1, 1)
 			panels.pnlRequestedQuantity:addComponent(btnsMinus[k])
 		end
 		if not btnsPlus[k] then
-			btnsPlus[k] = Button.create(g, "+", theme['successForegroundColour'], theme['successBackgroundColour'], 11, k, 1, 1)
+			btnsPlus[k] = Button.create(g, "+", theme['successForegroundColour'], theme['successBackgroundColour'], column3-3, k, 1, 1)
 			panels.pnlRequestedQuantity:addComponent(btnsPlus[k])
 		end
+
 	end
+
+	-- Add the pauseAll button
+	if not btnPauseAll then
+		btnPauseAll = Button.create(g, string.char(0x7c), colors.white, colors.red, -1, 2, 7, 3)
+		panels.pnlActions:addComponent(btnPauseAll)
+	end
+
+	-- Add the pause button
+	if not btnPause then
+		btnPause = Button.create(g, string.char(0x7c), colors.white, colors.gray, -1, 6, 7, 3)
+		panels.pnlActions:addComponent(btnPause)
+	end
+
+	-- Add the modify button
+	if not btnModify then
+		btnModify = Button.create(g, string.char(0xb1), colors.white, colors.gray, -1, 10, 7, 3)
+		panels.pnlActions:addComponent(btnModify)
+	end
+
+	-- Add the remove button
+	if not btnRemove then
+		btnRemove = Button.create(g, string.char(0xd7), colors.white, colors.gray, -1, 14, 7, 3)
+		panels.pnlActions:addComponent(btnRemove)
+	end
+
+	-- Assign the functions to the corresponding button callbacks
+	btnPauseAll:setAction(function() pauseAllItems() end)
+	btnPause:setAction(function() pauseItem(1) end)
+	btnModify:setAction(function() modifyItem(index) end)
+	btnRemove:setAction(function() removeItem(index) end)
+
 	setStatus("Updated info.")
+end
+
+local globalPause = false
+-- Function to pause all items in the requested items list
+local function pauseAllItems()
+	print("Pausing all items")
+	if not globalPause then
+		commands.pause.handler("all")
+		print("Pausing all items")
+		globalPause = true
+		btnPauseAll.setText(string.char(0x10))
+	elseif globalPause then
+		commands.unpause.handler("all")
+		print("Unausing all items")
+		globalPause = false
+		btnPauseAll.setText(string.char(0x7c))
+	end
+end
+
+-- Function to pause a specific item in the requested items list (You will need to pass the item index as an argument)
+local function pauseItem(index)
+    local requestedItems = janus.load('requestedItems.tmp')
+    if index >= 1 and index <= #requestedItems then
+        requestedItems[index]['status'] = "Paused"
+        janus.save("requestedItems.tmp", requestedItems)
+        updateInfo() -- Update the GUI to reflect the changes
+    else
+        printStatus("Invalid index number: " .. index)
+    end
+end
+
+-- Function to modify an item in the requested items list (You will need to pass the item index as an argument)
+local function modifyItem(index)
+    -- Implement your logic to modify the item here
+    -- For example, you can open a prompt for the user to enter new details for the item
+end
+
+-- Function to remove an item from the requested items list (You will need to pass the item index as an argument)
+local function removeItem(index)
+    -- Implement your logic to remove the item here
 end
 
 
