@@ -153,10 +153,10 @@ function updateInfo()
 	local requestedItems = janus.load('requestedItems.tmp')
 	for k, v in ipairs(requestedItems) do -- Iterate over requestedItems. The key (index) goes in k, the value (item) goes in v
 		--ipairs() because we want to preserve the order of the list
-		local displayName = v[nameConstant]
-		local availableQuantity = v['available']
-   	local requestedQuantity = v[requestedQuantityConstant]
-   	local status = v[statusConstant]
+		local displayName = v['name']
+		local availableQuantity = v['storedQuantity']
+   	local requestedQuantity = v['requestedQuantity']
+   	local status = v['status']
 		if not lblsDisplayName[k] then
 			lblsDisplayName[k] = Label.create(g, displayName, theme['textForegroundColour'], theme['textBackgroundColour'], 1, k, 25, 1)
 			panels.pnlDisplayName:addComponent(lblsDisplayName[k])

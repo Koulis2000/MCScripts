@@ -85,7 +85,7 @@ local function updateRequestedItems()
 
 	-- Group items by their last word
 	for _, requestedItem in pairs(requestedItems) do
-		local displayName = requestedItem[nameConstant]
+		local displayName = requestedItem['name']
 		local lastWord = getLastWord(displayName)
 
 		if not groupedItems[lastWord] then
@@ -98,7 +98,7 @@ local function updateRequestedItems()
 	-- Sort items within each group alphabetically
 	for _, group in pairs(groupedItems) do
 		table.sort(group, function(a, b)
-			return a[nameConstant] < b[nameConstant]
+			return a['name'] < b['name']
 			end)
 	end
 	print("Flattening resulting table back into requested items table...")
@@ -112,28 +112,28 @@ local function updateRequestedItems()
 	print("Updating information about requested and craftable items...")
 	-- Update the item information
 	for _, requestedItem in pairs(requestedItems) do
-		local displayName = requestedItem[nameConstant]
+		local displayName = requestedItem['name']
 		-- Check if the item is available in the ME Craftable Items list and get the details
 		for _, craftableItem in pairs(craftableItems) do
-			requestedItem[statusConstant] = "Not available"
+			requestedItem['status'] = "Not available"
 			if string.lower(craftableItem.displayName) == string.lower(displayName) then
-				requestedItem[idConstant] = craftableItem.name
-				requestedItem[fingerprintConstant] = craftableItem.fingerprint
-				requestedItem[craftableConstant] = craftableItem.isCraftable
-				requestedItem[countConstant] = craftableItem.amount or 0
-				requestedItem[statusConstant] = "Available"
+				requestedItem['id'] = craftableItem.name
+				requestedItem['fingerprint'] = craftableItem.fingerprint
+				requestedItem['craftable'] = craftableItem.isCraftable
+				requestedItem['storedQuantity'] = craftableItem.amount or 0
+				requestedItem['status'] = "Available"
 				break
 			end
 		end
 		-- Check if the item is available in the ME items list and get the details
 		for _, listItem in pairs(meItemList) do
-			requestedItem[statusConstant] = "No match"
+			requestedItem['status'] = "No match"
 			if string.lower(listItem.displayName) == string.lower(displayName) then
-				requestedItem[idConstant] = listItem.name
-				requestedItem[fingerprintConstant] = listItem.fingerprint
-				requestedItem[craftableConstant] = listItem.isCraftable
-				requestedItem[countConstant] = listItem.amount or 0
-				requestedItem[statusConstant] = "Match"	
+				requestedItem['id'] = listItem.name
+				requestedItem['fingerprint'] = listItem.fingerprint
+				requestedItem['craftable'] = listItem.isCraftable
+				requestedItem['storedQuantity'] = listItem.amount or 0
+				requestedItem['status'] = "Match"	
 				break
 			end
 		end
@@ -201,52 +201,51 @@ end
 -- Function to craft items to match the requested amounts
 local function craftCycle()
     local requestedItems = janus.load("requestedItems.tmp")
-
     for i, requestedItem in pairs(requestedItems) do
-        local name = requestedItem[idConstant]
-        local fingerprint = requestedItem[fingerprintConstant]
-        local craftable = requestedItem[craftableConstant]
-        local requestedQuantity = requestedItem[requestedQuantityConstant]
-        local displayName = requestedItem[nameConstant]
-        local count = requestedItem[countConstant]
-        local paused = requestedItem[pausedConstant] or false
+        local name = requestedItem['id']
+        local fingerprint = requestedItem['fingerprint']
+        local craftable = requestedItem['craftable']
+        local requestedQuantity = requestedItem['requestedQuantity']
+        local displayName = requestedItem['name']
+        local count = requestedItem['storedQuantity']
+        local paused = requestedItem['paused'] or false
 
         local displayText = string.format("%d. %s", i, displayName)
 
         if not paused then
             -- Reset the status message for each item
-            requestedItem[statusConstant] = ""
+            requestedItem['status'] = ""
 
             if count < requestedQuantity then
                 if craftable then
                     if not craftable then
                         local craftedItem = { name = name, count = requestedQuantity - count }
                         meBridge.craftItem(craftedItem)
-                        requestedItem[statusConstant] = "Attempting to craft..."
+                        requestedItem['status'] = "Attempting to craft..."
                     elseif meBridge.isItemCrafting({ name = name }) then
-                        requestedItem[statusConstant] = "Crafting..."
+                        requestedItem['status'] = "Crafting..."
                     end
                 elseif not craftable then
-                    requestedItem[statusConstant] = "Not craftable :("
+                    requestedItem['status'] = "Not craftable :("
                 end
             elseif count >= requestedQuantity then
                 local ratio = count / requestedQuantity
                 if ratio <= 1.1 then
-                    requestedItem[statusConstant] = "Stonked!"
+                    requestedItem['status'] = "Stonked!"
                 elseif ratio <= 2 then
-                    requestedItem[statusConstant] = "Doublestonked!"
+                    requestedItem['status'] = "Doublestonked!"
                 elseif ratio <= 3 then
-                    requestedItem[statusConstant] = "T-T-T-TRIPLESTONKED!"
+                    requestedItem['status'] = "T-T-T-TRIPLESTONKED!"
                 elseif count == 0 and requestedQuantity == 0 then
-                    requestedItem[statusConstant] = "No stock but, no need?"
+                    requestedItem['status'] = "No stock but, no need?"
                 elseif count > requestedQuantity and requestedQuantity == 0 then
-                    requestedItem[statusConstant] = "Stonked but, no need?"
+                    requestedItem['status'] = "Stonked but, no need?"
                 else
-                    requestedItem[statusConstant] = "Why's on the list?!"
+                    requestedItem['status'] = "Why's on the list?!"
                 end
             end
 	    else
-	    	requestedItem[statusConstant] = "Paused"
+	    	requestedItem['status'] = "Paused"
 	    end
     end
     janus.save("requestedItems.tmp", requestedItems)

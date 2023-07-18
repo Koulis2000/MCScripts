@@ -36,7 +36,7 @@ commands = {
                             local existingItem = false
 
                             for _, requestedItem in ipairs(requestedItems) do
-                                if string.lower(requestedItem[nameConstant]) == string.lower(item.displayName) then
+                                if string.lower(requestedItem['name']) == string.lower(item.displayName) then
                                     existingItem = true
                                     break
                                 end
@@ -44,7 +44,13 @@ commands = {
 
                             if not existingItem then
                                 local isCraftable = meBridge.isItemCraftable(item)
-                                table.insert(requestedItems, {item.name, "", item.count, item.displayName, isCraftable})
+                                --table.insert(requestedItems, {item.name, "", item.count, item.displayName, isCraftable})
+                                local requestedItem = {}
+                                requestedItem['id'] = item.name
+                                requestedItem['requestedQuantity'] = item.count
+                                requestedItem['name'] = item.displayName
+                                requestedItem['craftable'] = item.isCraftable
+                                table.insert(requestedItems, requestedItem)
                             end
                         end
                     end
@@ -68,14 +74,20 @@ commands = {
                 local existingItem = false
 
                 for _, requestedItem in ipairs(requestedItems) do
-                    if string.lower(requestedItem[4]) == string.lower(displayName) then
+                    if string.lower(requestedItem['name']) == string.lower(displayName) then
                         existingItem = true
                         break
                     end
                 end
 
                 if not existingItem then
-                    table.insert(requestedItems, {"", "", stockAmount, displayName, false})
+                    --table.insert(requestedItems, {"", "", stockAmount, displayName, false})
+                    local requestedItem = {}
+                    requestedItem['id'] = ""
+                    requestedItem['requestedQuantity'] = stockAmount
+                    requestedItem['name'] = displayName
+                    requestedItem['craftable'] = false
+                    table.insert(requestedItems, requestedItem)
                     print("Item '" .. displayName .. "' added with stock amount: " .. stockAmount)
                 else
                     print("Item '" .. displayName .. "' already exists in the requested items list")
@@ -118,7 +130,7 @@ commands = {
                 for _, index in ipairs(indexNumbers) do
                     if index >= 1 and index <= #requestedItems then -- Check if index is within bounds :thumbsup:
                         local item = requestedItems[index]
-                        item[requestedQuantityConstant] = newMinValue
+                        item['requestedQuantity'] = newMinValue
                         print("Modified 'min' value for item at index " .. index)
                     else
                         print("Invalid index number: " .. index)
@@ -152,8 +164,8 @@ commands = {
                 for _, index in ipairs(indexNumbers) do
                     if index >= 1 and index <= #requestedItems then
                         local item = requestedItems[index]
-                        item[pausedConstant] = true
-                        print("Item '" .. item[nameConstant] .. "' paused successfully")
+                        item['paused'] = true
+                        print("Item '" .. item['name'] .. "' paused successfully")
                     else
                         print("Invalid index number: " .. index)
                     end
@@ -192,8 +204,8 @@ commands = {
                 for _, index in ipairs(indexNumbers) do
                     if index >= 1 and index <= #requestedItems then
                         local item = requestedItems[index]
-                        item[pausedConstant] = false
-                        print("Item '" .. item[nameConstant] .. "' unpaused successfully")
+                        item['paused'] = false
+                        print("Item '" .. item['name'] .. "' unpaused successfully")
                     else
                         print("Invalid index number: " .. index)
                     end
@@ -226,7 +238,7 @@ commands = {
                 for _, index in ipairs(indexNumbers) do
                     if index >= 1 and index <= #requestedItems then
                         local removedItem = table.remove(requestedItems, index)
-                        print("Item '" .. removedItem[nameConstant] .. "' removed successfully")
+                        print("Item '" .. removedItem['name'] .. "' removed successfully")
                     else
                         print("Invalid index number: " .. index)
                     end
