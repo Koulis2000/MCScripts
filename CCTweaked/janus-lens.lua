@@ -14,24 +14,27 @@ if not commands then -- Checking that janus/commands.lua managed to define itsel
 	print("Commands not defined!")
 end
 
+-- Assign intercommunication files
+local commandReceive = "command.txt"
+local commandRespond = "response.txt"
+
 theme = {
-   titleForegroundColour = 0x200,
-   titleBackgroundColour = 0x80,
-   textForegroundColour = 0x1,
-   textBackgroundColour = 0x8000,
-   successForegroundColour = 0x20,
-   successBackgroundColour = 0x8000,
-   failureForegroundColour = 0x4000,
-   failureBackgroundColour = 0x8000,
-   buttonForegroundColour = 0x800,
-   buttonBackgroundColour = 0x8000,
-   textScale = 0.5
+	titleForegroundColour = 0x200,
+	titleBackgroundColour = 0x80,
+	textForegroundColour = 0x1,
+	textBackgroundColour = 0x8000,
+	successForegroundColour = 0x20,
+	successBackgroundColour = 0x8000,
+	failureForegroundColour = 0x4000,
+	failureBackgroundColour = 0x8000,
+	buttonForegroundColour = 0x800,
+	buttonBackgroundColour = 0x8000,
+	textScale = 0.5
 }
 
 -- Window variables
 local sizeX, sizeY
 local w = nil
-local winButtons = {}
 
 -- Initialise Waltz
 print("Initialising Waltz...")
@@ -43,26 +46,26 @@ print("\tRedirecting terminal...")
 term.redirect(monitor)
 print("\t\tApplying CC/OC compatibility patch...")
 if (mode == "CC") then -- CC/OC compatibility patch
-   monitor = term
-   thread = parallel
+monitor = term
+thread = parallel
    -- From now on, we can program a bit like we were running on OC and it will still work on CC
 end
 print("\tCreating window...")
 local x, y = 1, 1
 if (mode == "CC") then
 	print("\t\tDetermining size of window...")
-   sizeX, sizeY = monitor.getSize()
-   print("\t\tCreating...")
-   w = window.create(monitor.current(), x, y, sizeX, sizeY)
+	sizeX, sizeY = monitor.getSize()
+	print("\t\tCreating...")
+	w = window.create(monitor.current(), x, y, sizeX, sizeY)
 else
 	print("\t\tDetermining size of window...")
-   sizeX, sizeY = monitor.gpu().getResolution()
-   print("\t\tCreating...")
-   w = Window.create(x, y, sizeX, sizeY)
+	sizeX, sizeY = monitor.gpu().getResolution()
+	print("\t\tCreating...")
+	w = Window.create(x, y, sizeX, sizeY)
 end
 
 if (w == nil) then
-   error("Could not initialise window!")
+	error("Could not initialise window!")
 end
 
 --print("Created window: @ " .. x .. "&" .. y .. "/" .. sizeX .. "x" .. sizeY)
@@ -82,6 +85,7 @@ local function setStatus(status)
    end
    lblStatus:setText(statusText) -- If it did exist, just update the text on it
 end
+
 -- Calls setStatus with status as a parameter and prints status
 local function printStatus(status)
 	setStatus(status)
@@ -89,18 +93,44 @@ local function printStatus(status)
 end
 
 -- Initialise arrays for holding components
-	-- This should be done like the panels, below, instead, probably...
+-- This should be done like the panels, below, instead, probably...
 printStatus("Initialising component holding arrays...")
+
+local lblsIndex = {}
 local lblsDisplayName = {}
 local lblsAvailableQuantity = {}
 local lblsRequestedQuantity = {}
 local lblsStatus = {}
+local btnsSelect = {}
 local btnsPlus = {}
 local btnsMinus = {}
 local btnPauseAll = nil
 local btnPause = nil
 local btnModify = nil
 local btnRemove = nil
+local selectedItems = {}
+
+local checkedCharacter = string.char(0x8)
+local uncheckedCharacter = string.char(0x7)
+
+-- Function to get the selected items as a space-separated string
+local function getSelected()
+	local selectedIndexes = {}
+	for index, selected in pairs(selectedItems) do
+		if selected then
+			table.insert(selectedIndexes, index)
+		end
+	end
+	return table.concat(selectedIndexes, " ")
+end
+
+-- Function to clear the selection of items
+local function clearSelection()
+	for index, _ in pairs(selectedItems) do
+		selectedItems[index] = false
+		btnsSelect[index]:setText(uncheckedCharacter)
+	end
+end
 
 printStatus("Starting Janus Dossier (if not running)...")
 local dossierProcessID = nil
@@ -141,12 +171,22 @@ for _, p in pairs(panels) do
 	g:addComponent(p)
 end
 
+-- Function to write a command to the command file
+local function sendCommand(command)
+	local file = io.open(commandReceive, "w")
+	if file then
+		file:write(command)
+		file:close()
+		return true
+	end
+	return false
+end
 
 setStatus("Starting.....")
 write("Initialisation complete! Starting")
 for i = 4, 0, -1 do -- Make it a slow start to allow janus-dossier time for its first update, in case it wasn't running
-	write(".")
-	sleep(1)
+write(".")
+sleep(1)
 end
 
 function main()
@@ -163,17 +203,48 @@ function updateInfo()
 		--ipairs() because we want to preserve the order of the list
 		local displayName = v['name']
 		local availableQuantity = v['storedQuantity']
-   	local requestedQuantity = v['requestedQuantity']
-   	local status = v['status']
-		
-		local displayText = string.format("%2d. %s", k, displayName)
+		local requestedQuantity = v['requestedQuantity']
+		local status = v['status']
+		local checkBox = uncheckedCharacter
 
+		local formattedIndex = k -- the formatted index adds white spaces in front of the index number in order to align the text better
+		local decimalSpacer = 1 -- the decimalSpacer is used to space the display name correctly when the formattedIndex is long enough
 
+		if #requestedItems <= 9 then
+			formattedIndex = string.format("%d. ", k)
+			decimalSpacer = 4
+		elseif #requestedItems <= 90 then
+			formattedIndex = string.format("%2d. ", k)
+			decimalSpacer = 5
+		elseif #requestedItems <= 900 then
+			formattedIndex = string.format("%3d. ", k)
+			decimalSpacer = 6
+		end
+
+		if selectedItems[k] == nil or not selectedItems[k] then
+			checkBox = uncheckedCharacter
+			selectedItems[k] = false
+		elseif selectedItems[k] then
+			checkBox = checkedCharacter
+		end
+
+		if not btnsSelect[k] then
+			btnsSelect[k] = Button.create(g, checkBox, theme['failureForegroundColour'], theme['failureBackgroundColour'], 0, k, 1, 1)
+			panels.pnlDisplayName:addComponent(btnsSelect[k])
+		end
+		if not lblsIndex[k] then
+			lblsIndex[k] = Label.create(g, formattedIndex, theme['textForegroundColour'], theme['textBackgroundColour'], 2, k, decimalSpacer, 1)
+			panels.pnlDisplayName:addComponent(lblsIndex[k])
+		else
+			lblsIndex[k]:setText("")
+			lblsIndex[k]:setText(formattedIndex)
+		end
 		if not lblsDisplayName[k] then
-			lblsDisplayName[k] = Label.create(g, displayName, theme['textForegroundColour'], theme['textBackgroundColour'], 1, k, 25, 1)
+			lblsDisplayName[k] = Label.create(g, displayName, theme['textForegroundColour'], theme['textBackgroundColour'], decimalSpacer, k, 25, 1)
 			panels.pnlDisplayName:addComponent(lblsDisplayName[k])
 		else
-			lblsDisplayName[k]:setText(displayText)
+			lblsDisplayName[k]:setText("")
+			lblsDisplayName[k]:setText(displayName)
 		end
 		if not lblsAvailableQuantity[k] then
 			lblsAvailableQuantity[k] = Label.create(g, availableQuantity, theme['textForegroundColour'], theme['textBackgroundColour'], 2, k, 7, 1)
@@ -205,6 +276,30 @@ function updateInfo()
 			panels.pnlRequestedQuantity:addComponent(btnsPlus[k])
 		end
 
+		-- Click on it to select the item, click again to unselect it.
+		btnsSelect[k]:setAction(function(comp)
+			if selectedItems[k] then
+				selectedItems[k] = false
+				comp:setText(uncheckedCharacter)
+				printStatus("Unselected " .. k)
+			else
+				selectedItems[k] = true
+				comp:setText(checkedCharacter)
+				printStatus("Selected " .. k)
+			end
+		end)
+
+		-- Click to increase requested quantity by 1
+		btnsPlus[k]:setAction(function(comp)
+			sendCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity+1))
+			printStatus("Increased requested quantity for ".. displayName .. " by 1")
+		end)
+
+		-- Click to decrease requested quantity by 1
+		btnsMinus[k]:setAction(function(comp)
+			sendCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity-1))
+			printStatus("Decreased requested quantity for ".. displayName .. " by 1")
+		end)
 	end
 
 	-- Add the pauseAll button
@@ -213,7 +308,7 @@ function updateInfo()
 		panels.pnlActions:addComponent(btnPauseAll)
 	end
 
-	-- Add the pause button
+	-- Add the pause
 	if not btnPause then
 		btnPause = Button.create(g, string.char(0x7c), colors.white, colors.gray, -1, 6, 7, 3)
 		panels.pnlActions:addComponent(btnPause)
@@ -239,62 +334,56 @@ function updateInfo()
 														-- However, in order to read the value that was passed to this handler, we must 
 														-- tell this handler to expect a `comp` argument, which becomes our reference to 
 														-- the button that was clicked.
-		comp:setText('Works!') 	-- By referring to `btnPauseAll` as `comp`, we are able to call its object methods now that 
-										-- `comp` is an argument to this anonymous function.
-		pauseAllItems() 
+														-- By referring to `btnPauseAll` as `comp`, we are able to call its object methods now that 
+														-- `comp` is an argument to this anonymous function.
+														sendCommand("pause all")
 	end)
-	btnPause:setAction(function() pauseItem(1) end)
-	btnModify:setAction(function() modifyItem(index) end)
-	btnRemove:setAction(function() removeItem(index) end)
+
+	-- The pause button will take into consideration the selected items and pause them
+	btnPause:setAction(function()
+		if #selectedItems > 0 then
+			sendCommand("pause "..getSelected())
+			printStatus("Paused items " ..getSelected())
+			clearSelection()
+		else
+			printStatus("No items selected to pause")
+		end
+	end)
+	
+	-- The modify button will take into consideration the selected items and modify them, code not yet implemented
+	btnModify:setAction(function()
+		printStatus("Modify command not yet implemented.")
+		clearSelection()
+	end)
+
+	-- The remove button will take into consideration the selected items and remove them
+	btnRemove:setAction(function()
+		if #selectedItems > 0 then
+			sendCommand("remove "..getSelected())
+			printStatus("Removed items " ..getSelected())
+			clearSelection()
+		else
+			printStatus("No items selected to remove")
+		end
+	end)
 
 	setStatus("Updated info.")
 end
 
-local globalPause = false
--- Function to pause all items in the requested items list
-function pauseAllItems()
-	if not globalPause then -- The value of globalPause does not persist through program restarts, which means 
-									-- if the items are paused before a restart, you have to press the button twice
-									-- to unpause them (once to make the program think they are paused, and then once to
-									-- unpause).
-									-- To fix, the value of globalPause must be stored somewhere persistent.
-		commands.pause.handler("all")
-		setStatus("Pausing all items")
-		globalPause = true
-		--btnPauseAll.setText(string.char(0x10)) -- can't do this inside of button handlers because of scoping issues. See line 235.
-	elseif globalPause then
-		commands.unpause.handler("all")
-		setStatus("Unpausing all items")
-		globalPause = false
-		--btnPauseAll.setText(string.char(0x7c)) -- can't do this inside of button handlers because of scoping issues. See line 235.
-	end 
-end
-
--- Function to pause a specific item in the requested items list (You will need to pass the item index as an argument)
-function pauseItem(index)
-    local requestedItems = janus.load('requestedItems.tmp')
-    if index >= 1 and index <= #requestedItems then
-        requestedItems[index]['status'] = "Paused"
-        janus.save("requestedItems.tmp", requestedItems)
-        updateInfo() -- Update the GUI to reflect the changes
-    else
-        printStatus("Invalid index number: " .. index)
-    end
-end
-
--- Function to modify an item in the requested items list (You will need to pass the item index as an argument)
-function modifyItem(index)
-    -- Implement your logic to modify the item here
-    -- For example, you can open a prompt for the user to enter new details for the item
-end
-
--- Function to remove an item from the requested items list (You will need to pass the item index as an argument)
-function removeItem(index)
-    -- Implement your logic to remove the item here
+-- Function to check for updates from the processor program
+local function checkForUpdates()
+	local file = io.open(commandResponse, "r")
+	if file then
+		local response = file:read("*a")
+		file:close()
+		fs.delete(commandResponse) -- Remove the response file after reading its contents
+		return response
+	end
+	return nil
 end
 
 print(".")
-btnClose = Button.create(g, "X", colours.red, buttonBackgroundColour, sizeX, 1, 1, 1)
+btnClose = Button.create(g, "X", colours.gray, colours.red, sizeX, 1, 1, 1)
 btnClose.action = function() g.exit = true end
 g:addComponent(btnClose)
 g:run(main)

@@ -11,6 +11,10 @@ if not commands then -- Checking that janus/commands.lua managed to define itsel
 	print("Commands not defined!")
 end
 
+-- Assign intercommunication files
+local commandReceive = "command.txt"
+local commandRespond = "response.txt"
+
 -- Define global variables
 local programName = "ME Autocraft"
 local meBridge = peripheral.find("meBridge")
@@ -204,10 +208,10 @@ local function craftCycle()
         if requestedItem['paused'] == nil then
         	requestedItem['paused'] = false
         end
-        local paused = requestedItem['paused']
+        local itemPaused = requestedItem['paused']
 
         -- If the item is paused, we skip processing
-        if not paused then
+        if not itemPaused then
             -- Reset the status message for each item
             requestedItem['status'] = ""
             -- If the item is already crafting, we skip processing
@@ -242,7 +246,7 @@ local function craftCycle()
 	        else
 	        	requestedItem['status'] = "Crafting..."
 	        end
-	    elseif paused and meBridge.isItemCrafting({ name = name}) then -- Case where the item is paused but some other source started a crafting job
+	    elseif itemPaused and meBridge.isItemCrafting({ name = name}) then -- Case where the item is paused but some other source started a crafting job
 	    	requestedItem['status'] = "Manual crafting..."
 	    else
 	    	requestedItem['status'] = "Paused"
@@ -250,6 +254,8 @@ local function craftCycle()
     end
     janus.save("requestedItems.tmp", requestedItems)
 end
+
+
 
 -- Function to process user commands
 local function processCommand(input)
@@ -261,10 +267,30 @@ local function processCommand(input)
 			table.insert(commandArgs, arg)
 		end
 
-		commands[command].handler(table.unpack(commandArgs))
+		commands[command].handler(unpack(commandArgs))
+		print(tostring(unpack(commandArgs)))
 	else
 		print("Invalid command")
 	end
+end
+
+-- Function to read and process commands from the command file
+local function processLensCommands()
+    local file = io.open(commandReceive, "r")
+    if file then
+        local command = file:read("*l") -- Read the first line of the command file
+        file:close()
+        fs.delete(commandReceive) -- Remove the command file after reading its contents
+
+        processCommand(command)
+        print(command)
+
+        -- Write the response or status to the response file
+        local response = "Command processed: " .. command
+        local responseFile = io.open(commandRespond, "w")
+        responseFile:write(response)
+        responseFile:close()
+    end
 end
 
 -- Main program loop
@@ -275,7 +301,6 @@ local function mainLoop()
 	end
 end
 
-		local paused = false
 -- Craft loop
 local function craftLoop()
 	while true do
@@ -284,12 +309,21 @@ local function craftLoop()
 	end
 end
 
--- Function to read user inputs
-local function inputLoop()
+-- Function to process commands coming from janus-lens
+local function lensCommandLoop()
 	while true do
-		local input = read()
-		processCommand(input)
+		processLensCommands()
+		sleep(0.1)
 	end
 end
 
-parallel.waitForAll(mainLoop, craftLoop, inputLoop)
+-- Function to process user commands
+local function userCommandLoop()
+	while true do
+		local input = read()
+		processCommand(input)
+		sleep(0.1)
+	end
+end
+
+parallel.waitForAll(mainLoop, craftLoop, lensCommandLoop, userCommandLoop)
