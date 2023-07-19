@@ -37,6 +37,8 @@ local winButtons = {}
 print("Initialising Waltz...")
 print("\tDetecting monitor...")
 local monitor = peripheral.find("monitor")
+print("\tSetting text scale")
+monitor.setTextScale(theme['textScale'])
 print("\tRedirecting terminal...")
 term.redirect(monitor)
 print("\t\tApplying CC/OC compatibility patch...")
@@ -230,7 +232,17 @@ function updateInfo()
 	end
 
 	-- Assign the functions to the corresponding button callbacks
-	btnPauseAll:setAction(function() pauseAllItems() end)
+	btnPauseAll:setAction(function(comp) 	-- When you click the screen, Waltz figures out which component occupies the 
+														-- position you clicked and runs the action handler associated with that component 
+														-- (if the action is not nil). It passes the component as an argument [waltz.lua:264] 
+														-- to the action handler (which is the anonymous function that this comment is in). 
+														-- However, in order to read the value that was passed to this handler, we must 
+														-- tell this handler to expect a `comp` argument, which becomes our reference to 
+														-- the button that was clicked.
+		comp:setText('Works!') 	-- By referring to `btnPauseAll` as `comp`, we are able to call its object methods now that 
+										-- `comp` is an argument to this anonymous function.
+		pauseAllItems() 
+	end)
 	btnPause:setAction(function() pauseItem(1) end)
 	btnModify:setAction(function() modifyItem(index) end)
 	btnRemove:setAction(function() removeItem(index) end)
@@ -240,23 +252,26 @@ end
 
 local globalPause = false
 -- Function to pause all items in the requested items list
-local function pauseAllItems()
-	print("Pausing all items")
-	if not globalPause then
+function pauseAllItems()
+	if not globalPause then -- The value of globalPause does not persist through program restarts, which means 
+									-- if the items are paused before a restart, you have to press the button twice
+									-- to unpause them (once to make the program think they are paused, and then once to
+									-- unpause).
+									-- To fix, the value of globalPause must be stored somewhere persistent.
 		commands.pause.handler("all")
-		print("Pausing all items")
+		setStatus("Pausing all items")
 		globalPause = true
-		btnPauseAll.setText(string.char(0x10))
+		--btnPauseAll.setText(string.char(0x10)) -- can't do this inside of button handlers because of scoping issues. See line 235.
 	elseif globalPause then
 		commands.unpause.handler("all")
-		print("Unausing all items")
+		setStatus("Unpausing all items")
 		globalPause = false
-		btnPauseAll.setText(string.char(0x7c))
-	end
+		--btnPauseAll.setText(string.char(0x7c)) -- can't do this inside of button handlers because of scoping issues. See line 235.
+	end 
 end
 
 -- Function to pause a specific item in the requested items list (You will need to pass the item index as an argument)
-local function pauseItem(index)
+function pauseItem(index)
     local requestedItems = janus.load('requestedItems.tmp')
     if index >= 1 and index <= #requestedItems then
         requestedItems[index]['status'] = "Paused"
@@ -268,16 +283,18 @@ local function pauseItem(index)
 end
 
 -- Function to modify an item in the requested items list (You will need to pass the item index as an argument)
-local function modifyItem(index)
+function modifyItem(index)
     -- Implement your logic to modify the item here
     -- For example, you can open a prompt for the user to enter new details for the item
 end
 
 -- Function to remove an item from the requested items list (You will need to pass the item index as an argument)
-local function removeItem(index)
+function removeItem(index)
     -- Implement your logic to remove the item here
 end
 
-
 print(".")
+btnClose = Button.create(g, "X", colours.red, buttonBackgroundColour, sizeX, 1, 1, 1)
+btnClose.action = function() g.exit = true end
+g:addComponent(btnClose)
 g:run(main)
