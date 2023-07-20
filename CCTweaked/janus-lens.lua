@@ -15,7 +15,7 @@ if not commands then -- Checking that janus/commands.lua managed to define itsel
 end
 
 -- Assign intercommunication files
-local commandReceive = "command.txt"
+local commandQueue = "commandQueue.txt"
 local commandRespond = "response.txt"
 
 theme = {
@@ -48,7 +48,7 @@ print("\t\tApplying CC/OC compatibility patch...")
 if (mode == "CC") then -- CC/OC compatibility patch
 monitor = term
 thread = parallel
-   -- From now on, we can program a bit like we were running on OC and it will still work on CC
+	--From now on, we can program a bit like we were running on OC and it will still work on CC
 end
 print("\tCreating window...")
 local x, y = 1, 1
@@ -77,13 +77,13 @@ local lblStatus = nil
 
 -- Sets the text of the status label
 local function setStatus(status)
-   local x, y = w.getSize() -- Get size of the monitor
-   local statusText = textutils.formatTime(os.time(), true) .. ": " .. status -- Construct a string for the status label
-   if not lblStatus and lblStatus == nil then -- If the status label does not exist, ...
-      lblStatus = Label.create(g, statusText, theme['textForegroundColour'], theme['textBackgroundColour'], 1, y, x - 1, 1) -- ... create it.
-      g:addComponent(lblStatus) -- Then add it to the GUI object
-   end
-   lblStatus:setText(statusText) -- If it did exist, just update the text on it
+	local x, y = w.getSize() -- Get size of the monitor
+	local statusText = textutils.formatTime(os.time(), true) .. ": " .. status -- Construct a string for the status label
+	if not lblStatus and lblStatus == nil then -- If the status label does not exist, ...
+			lblStatus = Label.create(g, statusText, theme['textForegroundColour'], theme['textBackgroundColour'], 1, y, x - 1, 1) -- ... create it.
+			g:addComponent(lblStatus) -- Then add it to the GUI object
+	 end
+	 lblStatus:setText(statusText) -- If it did exist, just update the text on it
 end
 
 -- Calls setStatus with status as a parameter and prints status
@@ -171,15 +171,98 @@ for _, p in pairs(panels) do
 	g:addComponent(p)
 end
 
--- Function to write a command to the command file
-local function sendCommand(command)
-	local file = io.open(commandReceive, "w")
+
+-- Function to write commands to the command queue
+local function enqueueCommand(command)
+	local identifier = tostring(os.clock()):gsub("%.", "") -- Assign clock as the identifier
+	local file = io.open(commandQueue, "a")
 	if file then
-		file:write(command)
+		local commandData = {
+			id = identifier,
+			cmd = command
+		}
+		local serializedCommand = textutils.serializeJSON(commandData) -- Serialize the command table to JSON
+		file:write(serializedCommand .. "\n")
 		file:close()
 		return true
 	end
 	return false
+end
+
+
+-- Function to check for updates from the processor program
+local function checkForUpdates()
+	local file = io.open(commandRespond, "r")
+	if file then
+		local responseQueue = {} -- Table to hold response data
+		for line in file:lines() do
+			local responseData = textutils.unserializeJSON(line) -- Unserialize the line to get the response data table
+			table.insert(responseQueue, responseData) -- Append the response data to the queue
+		end
+		file:close()
+
+		-- Process the responses from the response queue
+		for _, responseData in ipairs(responseQueue) do
+			local commandId = responseData.id
+			local processedResponse = responseData.response
+			
+			print("Response for commandId:", commandId)
+			print("Processed response:", processedResponse)
+
+		end
+
+		-- Return the last commandId and its corresponding processedResponse
+		if #responseQueue > 0 then
+			local lastResponseData = responseQueue[#responseQueue]
+			return lastResponseData.id, lastResponseData.response
+		end
+	end
+	return nil
+end
+
+
+-- Function to remove a processed command from the command queue and its response
+local function removeProcessedCommand(commandId)
+	local file = io.open(commandQueue, "r")
+	local cmds = {}
+	if file then
+		for line in file:lines() do
+			local commandData = textutils.unserializeJSON(line) -- Unserialize the line to get the command data table
+			if tostring(commandData.id) ~= tostring(commandId) then
+				local serializedCommand = textutils.serializeJSON(commandData) -- Serialize the command data table back to a string
+				table.insert(cmds, serializedCommand)
+			end
+		end
+		file:close()
+	end
+
+	-- Rewrite the updated commands to the file
+	file = io.open(commandQueue, "w")
+	if file then
+		file:write(table.concat(cmds, "\n"))
+		file:close()
+	end
+
+	-- Remove the response with the same ID from the response file
+	file = io.open(commandRespond, "r")
+	local responses = {}
+	if file then
+		for line in file:lines() do
+			local responseData = textutils.unserializeJSON(line) -- Unserialize the line to get the response data table
+			if tostring(responseData.id) ~= tostring(commandId) then
+				local serializedResponse = textutils.serializeJSON(responseData) -- Serialize the response data table back to a string
+				table.insert(responses, serializedResponse)
+			end
+		end
+		file:close()
+	end
+
+	-- Rewrite the updated responses to the file
+	file = io.open(commandRespond, "w")
+	if file then
+		file:write(table.concat(responses, "\n"))
+		file:close()
+	end
 end
 
 setStatus("Starting.....")
@@ -195,8 +278,17 @@ function main()
 	-- Who needs sleep anyway? Let the UI run free and be the strong independent responsive insomniac UI it always wanted to be, Bjørn!
 	-- sleep(2) 
 	-- Bjørn: *comments out the sleep()* Off you go, UI, you're free now!
+	local commandId, processedResponse = checkForUpdates()
+	if commandId and processedResponse then
+		-- Remove the processed command from the command queue
+		removeProcessedCommand(commandId)
+		print(processedResponse)
+	end
+	sleep(0.1) -- I never sleep*, cause sleep is the cousin of death
+						-- (*for more than 0.1 seconds)
 end
 
+local globalPause = false
 local lastUpdateTime = os.clock()
 function updateInfo()
 	if (os.clock() - lastUpdateTime) < 3 then
@@ -297,58 +389,58 @@ function updateInfo()
 
 		-- Click to increase requested quantity by 1
 		btnsPlus[k]:setAction(function(comp)
-			sendCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity+1))
+			enqueueCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity+1))
 			printStatus("Increased requested quantity for ".. displayName .. " by 1")
 		end)
 
 		-- Click to decrease requested quantity by 1
 		btnsMinus[k]:setAction(function(comp)
-			sendCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity-1))
+			enqueueCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity-1))
 			printStatus("Decreased requested quantity for ".. displayName .. " by 1")
 		end)
 	end
 
 	-- Add the pauseAll button
 	if not btnPauseAll then
-		btnPauseAll = Button.create(g, string.char(0x7c), colors.white, colors.red, -1, 2, 7, 3)
+		btnPauseAll = Button.create(g, "STOP", colors.white, colors.red, -1, 2, 7, 3)
 		panels.pnlActions:addComponent(btnPauseAll)
 	end
 
 	-- Add the pause
 	if not btnPause then
-		btnPause = Button.create(g, string.char(0x7c), colors.white, colors.gray, -1, 6, 7, 3)
+		btnPause = Button.create(g, "PAUS", colors.white, colors.gray, -1, 6, 7, 3)
 		panels.pnlActions:addComponent(btnPause)
 	end
 
 	-- Add the modify button
 	if not btnModify then
-		btnModify = Button.create(g, string.char(0xb1), colors.white, colors.gray, -1, 10, 7, 3)
+		btnModify = Button.create(g, "MOD", colors.white, colors.gray, -1, 10, 7, 3)
 		panels.pnlActions:addComponent(btnModify)
 	end
 
 	-- Add the remove button
 	if not btnRemove then
-		btnRemove = Button.create(g, string.char(0xd7), colors.white, colors.gray, -1, 14, 7, 3)
+		btnRemove = Button.create(g, "REM", colors.white, colors.gray, -1, 14, 7, 3)
 		panels.pnlActions:addComponent(btnRemove)
 	end
 
 	-- Assign the functions to the corresponding button callbacks
-	btnPauseAll:setAction(function(comp) 	-- When you click the screen, Waltz figures out which component occupies the 
-														-- position you clicked and runs the action handler associated with that component 
-														-- (if the action is not nil). It passes the component as an argument [waltz.lua:264] 
-														-- to the action handler (which is the anonymous function that this comment is in). 
-														-- However, in order to read the value that was passed to this handler, we must 
-														-- tell this handler to expect a `comp` argument, which becomes our reference to 
-														-- the button that was clicked.
-														-- By referring to `btnPauseAll` as `comp`, we are able to call its object methods now that 
-														-- `comp` is an argument to this anonymous function.
-		sendCommand("pause all")
+	btnPauseAll:setAction(function(comp)
+		if not globalPause then
+			enqueueCommand("pause all")
+			globalPause = true
+			comp:setText("CONT")
+		elseif globalPause then
+			enqueueCommand("unpause all")
+			globalPause = false
+			comp:setText("STOP")
+		end
 	end)
 
 	-- The pause button will take into consideration the selected items and pause them
 	btnPause:setAction(function()
 		if #selectedItems > 0 then
-			sendCommand("pause "..getSelected())
+			enqueueCommand("pause "..getSelected())
 			printStatus("Paused items " ..getSelected())
 			clearSelection()
 		else
@@ -365,7 +457,7 @@ function updateInfo()
 	-- The remove button will take into consideration the selected items and remove them
 	btnRemove:setAction(function()
 		if #selectedItems > 0 then
-			sendCommand("remove "..getSelected())
+			enqueueCommand("remove "..getSelected())
 			printStatus("Removed items " ..getSelected())
 			clearSelection()
 		else
@@ -374,18 +466,6 @@ function updateInfo()
 	end)
 	lastUpdateTime = os.clock()
 	setStatus("Updated info.")
-end
-
--- Function to check for updates from the processor program
-local function checkForUpdates()
-	local file = io.open(commandResponse, "r")
-	if file then
-		local response = file:read("*a")
-		file:close()
-		fs.delete(commandResponse) -- Remove the response file after reading its contents
-		return response
-	end
-	return nil
 end
 
 print(".")
