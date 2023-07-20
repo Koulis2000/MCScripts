@@ -194,63 +194,72 @@ end
 
 -- Function to craft items to match the requested amounts
 local function craftCycle()
-    local requestedItems = janus.load("requestedItems.tmp")
-    for i, requestedItem in pairs(requestedItems) do
-        local name = requestedItem['id']
+   local requestedItems = janus.load("requestedItems.tmp")
+   for i, requestedItem in pairs(requestedItems) do
+      local name = requestedItem['id']
     	local matchingMeItem = meBridge.getItem({name = name}) -- Always get live, accurate, information
+    	if not matchingMeItem then -- Gotta check if it's nil!
+    		-- Handle the problem properly so the loop may continue
+    		-- Possible solutions: 
+    			-- Remove the offending item and suggest the user add it through the chest instead
+    			-- Attempt another method of getting the required information about the item
+    			-- Ask the user to manually enter the required information
+    		print("No match found for item " .. name .. "! Cannot continue craft cycle!")
+    		return -- Loop can't continue because requestedItems is essentially corrupted
+    	end
     	requestedItem['storedQuantity'] = matchingMeItem['amount']
     	requestedItem['craftable'] = matchingMeItem['isCraftable']
-        local fingerprint = requestedItem['fingerprint']
-        local craftable = requestedItem['craftable']
-        local requestedQuantity = requestedItem['requestedQuantity']
-        local displayName = requestedItem['name']
-        local count = requestedItem['storedQuantity']
-        if requestedItem['paused'] == nil then
-        	requestedItem['paused'] = false
-        end
-        local itemPaused = requestedItem['paused']
+      local fingerprint = requestedItem['fingerprint']
+      local craftable = requestedItem['craftable']
+      local requestedQuantity = requestedItem['requestedQuantity']
+      local displayName = requestedItem['name']
+      local count = requestedItem['storedQuantity']
+      if requestedItem['paused'] == nil then
+      	requestedItem['paused'] = false
+      end
+      local itemPaused = requestedItem['paused']
 
-        -- If the item is paused, we skip processing
-        if not itemPaused then
-            -- Reset the status message for each item
-            requestedItem['status'] = ""
-            -- If the item is already crafting, we skip processing
-            if not meBridge.isItemCrafting({ name = name}) then
-            	-- If the stored quantity is lower than the requested Quantity, we move to the next step...
-	            if count < requestedQuantity then
-	            	-- ...which checks if the item is craftable...
-	                if craftable then
-	                	-- if it is craftable, we order the crafting
-                        local craftOrder = { name = name, count = requestedQuantity - count }
-                        meBridge.craftItem(craftOrder)
-                        requestedItem['status'] = "Attempting to craft..."
-	                elseif not craftable then
-	                    requestedItem['status'] = "Not craftable :("
-	                end
-	            elseif count >= requestedQuantity then
-	                local ratio = count / requestedQuantity
-	                if ratio <= 1.1 then
-	                    requestedItem['status'] = "Stonked!"
-	                elseif ratio <= 2 then
-	                    requestedItem['status'] = "Doublestonked!"
-	                elseif ratio <= 3 then
-	                    requestedItem['status'] = "T-T-T-TRIPLESTONKED!"
-	                elseif count == 0 and requestedQuantity == 0 then
-	                    requestedItem['status'] = "No stock but, no need?"
-	                elseif count > requestedQuantity and requestedQuantity == 0 then
-	                    requestedItem['status'] = "Stonked but, no need?"
-	                else
-	                    requestedItem['status'] = "Why's on the list?!"
-	                end
+      -- If the item is paused, we skip processing
+      if not itemPaused then
+         -- Reset the status message for each item
+         requestedItem['status'] = ""
+         -- If the item is already crafting, we skip processing
+         if not meBridge.isItemCrafting({ name = name}) then
+         	-- If the stored quantity is lower than the requested Quantity, we move to the next step...
+	         if count < requestedQuantity then
+	         	-- ...which checks if the item is craftable...
+	            if craftable then
+	             	-- if it is craftable, we order the crafting
+                  local craftOrder = { name = name, count = requestedQuantity - count }
+                  meBridge.craftItem(craftOrder)
+                  requestedItem['status'] = "Attempting to craft..."
+	            elseif not craftable then
+	               requestedItem['status'] = "Not craftable :("
 	            end
-	        else
-	        	requestedItem['status'] = "Crafting..."
-	        end
-	    elseif itemPaused and meBridge.isItemCrafting({ name = name}) then -- Case where the item is paused but some other source started a crafting job
-	    	requestedItem['status'] = "Manual crafting..."
-	    else
-	    	requestedItem['status'] = "Paused"
-	    end
+            elseif count >= requestedQuantity then
+            	local ratio = count / requestedQuantity
+               if ratio <= 1.1 then
+                  requestedItem['status'] = "Stonked!"
+               elseif ratio <= 2 then
+                  requestedItem['status'] = "Doublestonked!"
+               elseif ratio <= 3 then
+                  requestedItem['status'] = "T-T-T-TRIPLESTONKED!"
+               elseif count == 0 and requestedQuantity == 0 then
+                  requestedItem['status'] = "No stock but, no need?"
+               elseif count > requestedQuantity and requestedQuantity == 0 then
+                  requestedItem['status'] = "Stonked but, no need?"
+               else
+                  requestedItem['status'] = "Why's on the list?!"
+               end
+            end
+      	else
+        		requestedItem['status'] = "Crafting..."
+         end
+   	elseif itemPaused and meBridge.isItemCrafting({ name = name}) then -- Case where the item is paused but some other source started a crafting job
+    		requestedItem['status'] = "Manual crafting..."
+   	else
+    		requestedItem['status'] = "Paused"
+    	end
     end
     janus.save("requestedItems.tmp", requestedItems)
 end
