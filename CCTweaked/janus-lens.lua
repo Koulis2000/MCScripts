@@ -192,11 +192,17 @@ end
 function main()
 	-- Do things
 	updateInfo()
-	-- Get some sleep
-	sleep(2)
+	-- Who needs sleep anyway? Let the UI run free and be the strong independent responsive insomniac UI it always wanted to be, Bjørn!
+	-- sleep(2) 
+	-- Bjørn: *comments out the sleep()* Off you go, UI, you're free now!
 end
 
+local lastUpdateTime = os.clock()
 function updateInfo()
+	if (os.clock() - lastUpdateTime) < 3 then
+		return 	-- less than 3 seconds since last info update, let's not do it again yet (to avoid excessive UI updates)
+					-- excessive updates may eat debug/status messages, making us miss them
+	end
 	setStatus("Updating info...")
 	local requestedItems = janus.load('requestedItems.tmp')
 	for k, v in ipairs(requestedItems) do -- Iterate over requestedItems. The key (index) goes in k, the value (item) goes in v
@@ -336,7 +342,7 @@ function updateInfo()
 														-- the button that was clicked.
 														-- By referring to `btnPauseAll` as `comp`, we are able to call its object methods now that 
 														-- `comp` is an argument to this anonymous function.
-														sendCommand("pause all")
+		sendCommand("pause all")
 	end)
 
 	-- The pause button will take into consideration the selected items and pause them
@@ -366,7 +372,7 @@ function updateInfo()
 			printStatus("No items selected to remove")
 		end
 	end)
-
+	lastUpdateTime = os.clock()
 	setStatus("Updated info.")
 end
 
@@ -384,6 +390,6 @@ end
 
 print(".")
 btnClose = Button.create(g, "X", colours.gray, colours.red, sizeX, 1, 1, 1)
-btnClose.action = function() g.exit = true end
+btnClose:setAction(function() g.exit = true end)
 g:addComponent(btnClose)
 g:run(main)
