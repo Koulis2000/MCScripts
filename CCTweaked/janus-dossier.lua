@@ -224,6 +224,7 @@ local function craftCycle()
 				-- Attempt another method of getting the required information about the item
 				-- Ask the user to manually enter the required information
 			print("No match found for item " .. name .. "! Cannot continue craft cycle!")
+			releaseFileLock() -- Must release the file lock, otherwise the craftCycle() hangs indefinitely
 			return -- Loop can't continue because requestedItems is essentially corrupted
 		end
 		requestedItem['storedQuantity'] = matchingMeItem['amount']
