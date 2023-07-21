@@ -150,7 +150,7 @@ local function updateRequestedItems()
 	local groupedItems = {}
 
 	-- Group items by their last word
-	for _, requestedItem in pairs(requestedItems) do
+	for _, requestedItem in ipairs(requestedItems) do
 		local displayName = requestedItem['name']
 		local lastWord = getLastWord(displayName)
 
@@ -162,7 +162,7 @@ local function updateRequestedItems()
 	end
 	print("Sorting items alphabetically within their respective groups...")
 	-- Sort items within each group alphabetically
-	for _, group in pairs(groupedItems) do
+	for _, group in ipairs(groupedItems) do
 		table.sort(group, function(a, b)
 			return a['name'] < b['name']
 			end)
@@ -170,8 +170,8 @@ local function updateRequestedItems()
 	print("Flattening resulting table back into requested items table...")
 	-- Flatten the grouped items back into the requested items table
 	requestedItems = {}
-	for _, group in pairs(groupedItems) do
-		for _, item in pairs(group) do
+	for _, group in ipairs(groupedItems) do
+		for _, item in ipairs(group) do
 			table.insert(requestedItems, item)
 		end
 	end
