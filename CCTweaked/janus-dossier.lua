@@ -153,7 +153,7 @@ local function updateRequestedItems()
 	isFileLocked = false
 end
 
--- Function to craft items to match the requested amounts
+-- Function to craft items to match the requested quantity
 local function craftCycle()
 	if not isFileLocked then
 		isFileLocked = true
@@ -175,7 +175,7 @@ local function craftCycle()
 			local craftable = requestedItem['craftable']
 			local requestedQuantity = requestedItem['requestedQuantity']
 			local displayName = requestedItem['name']
-			local count = requestedItem['storedQuantity']
+			local storedQuantity = requestedItem['storedQuantity']
 
 			if requestedItem['paused'] == nil then
 				requestedItem['paused'] = false
@@ -189,11 +189,11 @@ local function craftCycle()
 				-- If the item is already crafting, we skip processing
 				if not meBridge.isItemCrafting({ name = name }) then
 					-- If the stored quantity is lower than the requested Quantity, we move to the next step...
-					if count < requestedQuantity then
+					if storedQuantity < requestedQuantity then
 						-- ...which checks if the item is craftable...
 						if craftable then
 							-- if it is craftable, we order the crafting
-							local craftOrder = { name = name, count = requestedQuantity - count }
+							local craftOrder = { name = name, count = requestedQuantity - storedQuantity }
 							local maxRetryCount = 5
 							local retryCount = 0
 
@@ -201,7 +201,7 @@ local function craftCycle()
 								meBridge.craftItem(craftOrder)
 								os.sleep(0.2)
 								if not meBridge.isItemCrafting(craftOrder) then
-									-- Crafting failed, reduce the craft order count by 25% and retry
+									-- Crafting failed, reduce the craft order quantity by 25% and retry
 									craftOrder.count = math.max(1, math.floor(craftOrder.count * 0.75))
 									retryCount = retryCount + 1
 								else
@@ -217,17 +217,17 @@ local function craftCycle()
 						elseif not craftable then
 							requestedItem['status'] = "Not craftable :("
 						end
-					elseif count >= requestedQuantity then
-						local ratio = count / requestedQuantity
+					elseif storedQuantity >= requestedQuantity then
+						local ratio = storedQuantity / requestedQuantity
 						if ratio <= 1.1 then
 							requestedItem['status'] = "Stonked!"
 						elseif ratio <= 2 then
 							requestedItem['status'] = "Doublestonked!"
 						elseif ratio <= 3 then
 							requestedItem['status'] = "T-T-T-TRIPLESTONKED!"
-						elseif count == 0 and requestedQuantity == 0 then
-							requestedItem['status'] = "No stock but, no need?"
-						elseif count > requestedQuantity and requestedQuantity == 0 then
+						elseif storedQuantity == 0 and requestedQuantity == 0 then
+							requestedItem['status'] = "No stonk but, no need?"
+						elseif storedQuantity > requestedQuantity and requestedQuantity == 0 then
 							requestedItem['status'] = "Stonked but, no need?"
 						else
 							requestedItem['status'] = "Why's on the list?!"
@@ -249,8 +249,7 @@ end
 
 
 -- Function to check if a command is already processed
-local function isCommandProcessed(commandId, responseFile)
-	local responseQueue = janus.load(responseFile, {})
+local function isCommandProcessed(commandId, responseQueue)
 	for _, responseData in ipairs(responseQueue) do
 		if responseData.id == commandId then
 			return true
@@ -271,7 +270,6 @@ local function processCommand(input, override)
 		end
 
 		commands[command].handler(unpack(commandArgs))
-		print(unpack(commandArgs))
 		
 		releaseFileLock()
 		return "command finished processing"
@@ -287,10 +285,10 @@ end
 local function processLensCommands()
 	getFileLock()
 	local commandQueue = janus.load("commandQueue.tmp", {})
-	local responseQueue = {}
+	local responseQueue = janus.load("commandResponses.tmp", {})
 	for _, commandData in ipairs(commandQueue) do
 		local commandId = commandData.id
-		if not isCommandProcessed(commandId, "commandResponses.tmp") then
+		if not isCommandProcessed(commandId, responseQueue) then
 			local response = processCommand(commandData.cmd, true)
 			print(commandId .. " " .. response)
 			table.insert(responseQueue, { id = commandId, response = response })
@@ -300,7 +298,6 @@ local function processLensCommands()
 	end
 
 	janus.save("commandResponses.tmp", responseQueue)
-
 	releaseFileLock()
 end
 

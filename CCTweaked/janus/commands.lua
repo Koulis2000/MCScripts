@@ -102,7 +102,7 @@ local function addInventoryItems(requestedItems)
 			if not existingItem then
 				table.insert(requestedItems, {
 					id = "",
-					requestedQuantity = stockAmount,
+					requestedQuantity = requestedQuantity,
 					storedQuantity = 0,
 					name = displayName,
 					craftable = false,
@@ -127,7 +127,7 @@ commands = {
 				addInventoryItems(requestedItems)
 			else
 				local displayName = table.concat(args, " ", 1, #args - 1)
-				local stockAmount = tonumber(args[#args]) or 0
+				local requestedQuantity = tonumber(args[#args]) or 0
 
 				local existingItem = false
 
@@ -141,7 +141,7 @@ commands = {
 				if not existingItem then
 					table.insert(requestedItems, {
 						id = "",
-						requestedQuantity = stockAmount,
+						requestedQuantity = requestedQuantity,
 						storedQuantity = 0,
 						name = displayName,
 						craftable = false,
@@ -149,7 +149,7 @@ commands = {
 						status = "Pending update...",
 						fingerpring = "",
 					})
-					response = "Item '" .. displayName .. "' added with stock amount: " .. stockAmount
+					response = "Item '" .. displayName .. "' added with requested quantity: " .. requestedQuantity
 				else
 					response = "Item '" .. displayName .. "' already exists in the requested items list"
 				end
@@ -163,7 +163,7 @@ commands = {
 	},
 
 	modify = {
-		description = "Modify the 'min' value for item(s) in the requested items list",
+		description = "Modify the requested quantity for item(s) in the requested items list",
 		handler = function(...)
 			local args = {...}
 			local requestedItems = janus.load("requestedItems.tmp")
