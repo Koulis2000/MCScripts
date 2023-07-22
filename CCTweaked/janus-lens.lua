@@ -14,10 +14,6 @@ if not commands then -- Checking that janus/commands.lua managed to define itsel
 	print("Commands not defined!")
 end
 
--- Assign intercommunication files
-local commandQueue = "commandQueue.txt"
-local commandRespond = "response.txt"
-
 theme = {
 	titleForegroundColour = 0x200,
 	titleBackgroundColour = 0x80,
@@ -175,47 +171,31 @@ end
 -- Function to write commands to the command queue
 local function enqueueCommand(command)
 	local identifier = tostring(os.clock()):gsub("%.", "") -- Assign clock as the identifier
-	local file = io.open(commandQueue, "a")
-	if file then
-		local commandData = {
-			id = identifier,
-			cmd = command
-		}
-		local serializedCommand = textutils.serializeJSON(commandData) -- Serialize the command table to JSON
-		file:write(serializedCommand .. "\n")
-		file:close()
-		return true
-	end
-	return false
+	local commandQueue = janus.load("commandQueue.tmp")
+	local commandData = {
+		id = identifier,
+		cmd = command
+	}
+	table.insert(commandQueue, commandData)
+	janus.save("commandQueue.tmp", commandQueue)
 end
 
 
 -- Function to check for updates from the processor program
 local function checkForUpdates()
-	local file = io.open(commandRespond, "r")
-	if file then
-		local responseQueue = {} -- Table to hold response data
-		for line in file:lines() do
-			local responseData = textutils.unserializeJSON(line) -- Unserialize the line to get the response data table
-			table.insert(responseQueue, responseData) -- Append the response data to the queue
-		end
-		file:close()
-
-		-- Process the responses from the response queue
-		for _, responseData in ipairs(responseQueue) do
-			local commandId = responseData.id
-			local processedResponse = responseData.response
+	local responseQueue = janus.load("commandResponses.tmp", {}) -- Table to hold response data
+	for _, responseData in ipairs(responseQueue) do
+		local commandId = responseData.id
+		local processedResponse = responseData.response
 			
-			print("Response for commandId:", commandId)
-			print("Processed response:", processedResponse)
+		print("Response for commandId:", commandId)
+		print("Processed response:", processedResponse)
+	end
 
-		end
-
-		-- Return the last commandId and its corresponding processedResponse
-		if #responseQueue > 0 then
-			local lastResponseData = responseQueue[#responseQueue]
-			return lastResponseData.id, lastResponseData.response
-		end
+	-- Return the last commandId and its corresponding processedResponse
+	if #responseQueue > 0 then
+		local lastResponseData = responseQueue[#responseQueue]
+		return lastResponseData.id, lastResponseData.response
 	end
 	return nil
 end
@@ -223,46 +203,23 @@ end
 
 -- Function to remove a processed command from the command queue and its response
 local function removeProcessedCommand(commandId)
-	local file = io.open(commandQueue, "r")
+	local commandQueue = janus.load("commandQueue.tmp", {})
 	local cmds = {}
-	if file then
-		for line in file:lines() do
-			local commandData = textutils.unserializeJSON(line) -- Unserialize the line to get the command data table
-			if tostring(commandData.id) ~= tostring(commandId) then
-				local serializedCommand = textutils.serializeJSON(commandData) -- Serialize the command data table back to a string
-				table.insert(cmds, serializedCommand)
-			end
+	for _, commandData in ipairs(commandQueue) do
+		if tostring(commandData.id) ~= tostring(commandId) then
+			table.insert(cmds, commandData)
 		end
-		file:close()
 	end
+	janus.save("commandQueue.tmp", cmds)
 
-	-- Rewrite the updated commands to the file
-	file = io.open(commandQueue, "w")
-	if file then
-		file:write(table.concat(cmds, "\n"))
-		file:close()
-	end
-
-	-- Remove the response with the same ID from the response file
-	file = io.open(commandRespond, "r")
+	local responseQueue = janus.load("commandResponses.tmp", {})
 	local responses = {}
-	if file then
-		for line in file:lines() do
-			local responseData = textutils.unserializeJSON(line) -- Unserialize the line to get the response data table
-			if tostring(responseData.id) ~= tostring(commandId) then
-				local serializedResponse = textutils.serializeJSON(responseData) -- Serialize the response data table back to a string
-				table.insert(responses, serializedResponse)
-			end
+	for _, responseData in ipairs(responseQueue) do
+		if tostring(responseData.id) ~= tostring(commandId) then
+			table.insert(responses, responseData)
 		end
-		file:close()
 	end
-
-	-- Rewrite the updated responses to the file
-	file = io.open(commandRespond, "w")
-	if file then
-		file:write(table.concat(responses, "\n"))
-		file:close()
-	end
+	janus.save("commandResponses.tmp", responses)
 end
 
 setStatus("Starting.....")
@@ -297,12 +254,13 @@ function updateInfo()
 	end
 	setStatus("Updating info...")
 	local requestedItems = janus.load('requestedItems.tmp')
+	local statusStore = janus.load('statusStore.tmp')
 	for k, v in ipairs(requestedItems) do -- Iterate over requestedItems. The key (index) goes in k, the value (item) goes in v
 		--ipairs() because we want to preserve the order of the list
 		local displayName = v['name']
 		local availableQuantity = v['storedQuantity']
 		local requestedQuantity = v['requestedQuantity']
-		local status = v['status']
+		local status = statusStore[k]['status']
 		local checkBox = uncheckedCharacter
 
 		local formattedIndex = k -- the formatted index adds white spaces in front of the index number in order to align the text better

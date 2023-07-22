@@ -1,3 +1,6 @@
+-- janus-dossier.lua is responsible for updating items with the correct information acquired
+-- from the ME Bridge. It will process commands and decide how to proceed with them.
+
 -- Import libraries
 inspect = require('inspect') -- Defined as a global (not local). This allows commands.lua to use it.
 -- Read commands definition file
@@ -5,22 +8,33 @@ require('janus/commands') 	-- Note that this is not commands = require('janus/co
 							-- The reason is that janus/commands.lua defines the global
 							-- variable commands when it is required. Since it is global,
 							-- it is available from this file as well.
-local janus = require('libjanus')
+							local janus = require('libjanus')
 if not commands then -- Checking that janus/commands.lua managed to define itself
 	-- If not, the program still runs, but commands won't work
 	print("Commands not defined!")
 end
 
--- Assign intercommunication files
-local commandQueue = "commandQueue.txt"
-local commandRespond = "response.txt"
-
 -- Define global variables
 local programName = "ME Autocraft"
 local meBridge = peripheral.find("meBridge")
-local validTypes = {"chest", "shulker_box", "barrel", "backpack"}
 
 local isFileLocked = false -- Virtual lock file
+
+-- Utility functions
+-- Helper function to check if an item has only one word in its name
+local function hasOneWord(name)
+	return not name:find("%s")
+end
+
+-- Helper function to extract the last word from a string
+-- Helper function to extract the last word from a string
+local function getLastWord(str)
+	local words = {}
+	for word in str:gmatch("%S+") do
+		table.insert(words, word)
+	end
+	return words[#words] or ""
+end
 
 -- Function to get file lock
 local function getFileLock()
@@ -35,226 +49,173 @@ local function releaseFileLock()
 	isFileLocked = false
 end
 
--- Function to check if an inventory exists (or, truthfully, if part of its id matches the above strings)
-local function isInventory()
-	for _, side in ipairs(peripheral.getNames()) do
-		local peripheralType = peripheral.getType(side)
-		for _, validType in ipairs(validTypes) do
-			if peripheralType and string.find(string.lower(peripheralType), string.lower(validType)) then
-				return true
-			end
-		end
-	end
-	return false
-end
-
--- Function to get the inventory object
-local function getInventory()
-	for _, side in ipairs(peripheral.getNames()) do
-		local peripheralType = peripheral.getType(side)
-		for _, validType in ipairs(validTypes) do
-			if peripheralType and string.find(string.lower(peripheralType), string.lower(validType)) then
-				return peripheral.wrap(side)
-			end
-		end
-	end
-	return nil
-end
-
 local craftableItems = nil -- When the program runs, craftableItems is initialised to nil
 local function getCraftableItems() -- This function delaggifies listCraftableItems() by running it only once per program start
 	if craftableItems == nil then -- If it is still nil, run the laggy function to make it not nil
-		print("\tUpdating list...")
-		craftableItems = meBridge.listCraftableItems()
-	end
+	print("\tUpdating list...")
+	craftableItems = meBridge.listCraftableItems()
+end
 	return craftableItems -- Return the result
-end
-
-
--- Helper function to find an item index by Display Name
-local function finditemIndex(requestedItems, displayName)
-	for i, requestedItem in pairs(requestedItems) do
-		if item['name'] == displayName then
-			return i
-		end
-	end
-	return nil
-end
-
--- Function to pause an item in the requested items list in the settings based on Display Name
-local function pauseItem(displayName)
-	local requestedItems = janus.load("requestedItems.tmp")
-	local itemIndex = finditemIndex(requestedItems, displayName)
-
-	if itemIndex then
-		requestedItems[itemIndex]['paused'] = true
-		print("Item '" .. displayName .. "' paused successfully")
-	else
-		print("Item '" .. displayName .. "' not found in the requested items list")
-	end
-
-	janus.save("requestedItems.tmp", requestedItems)
-end
-
--- Function to unpause an item in the requested items list in the settings based on Display Name
-local function unpauseItem(displayName)
-	local requestedItems = janus.load("requestedItems.tmp")
-	local itemIndex = finditemIndex(requestedItems, displayName)
-
-	if itemIndex then
-		requestedItems[itemIndex]['paused'] = false
-		print("Item '" .. displayName .. "' unpaused successfully")
-	else
-		print("Item '" .. displayName .. "' not found in the requested items list")
-	end
-
-	janus.save("requestedItems.tmp", requestedItems)
-end
-
--- Function to remove an item from the requested items list in the settings based on Display Name
-local function removeItem(displayName)
-	local requestedItems = janus.load("requestedItems.tmp")
-	local itemIndex = finditemIndex(requestedItems, displayName)
-
-	if itemIndex then
-		table.remove(requestedItems, itemIndex)
-		print("Item '" .. displayName .. "' removed successfully")
-	else
-		print("Item '" .. displayName .. "' not found in the requested items list")
-	end
-
-	janus.save("requestedItems.tmp", requestedItems)
 end
 
 -- Function that definitely needs optimization
 local function updateRequestedItems()
-	getFileLock()
-	-- Update the requested items table with information from the ME network
-	print("Loading requestedItems...")
-	local requestedItems = janus.load("requestedItems.tmp")
-	print("\t" .. #requestedItems .. " items requested.")
-	print("Getting list of craftable items in ME network...")
-	local craftableItems = getCraftableItems()
-	print("\t" .. #craftableItems .. " items craftable by ME network.")
-	print("Updating list of items in ME network...")
-	local meItemList = meBridge.listItems()
-	print("\t" .. #meItemList .. " items in ME network.")
+	if not isFileLocked then
+		isFileLocked = true
+		-- Update the requested items table with information from the ME network
+		print("Loading requestedItems...")
+		local requestedItems = janus.load("requestedItems.tmp")
+		print("\t" .. #requestedItems .. " items requested.")
+		print("Getting list of craftable items in ME network...")
+		local craftableItems = getCraftableItems()
+		print("\t" .. #craftableItems .. " items craftable by ME network.")
+		print("Updating list of items in ME network...")
+		local meItemList = meBridge.listItems()
+		print("\t" .. #meItemList .. " items in ME network.")
 
-	-- Helper function to extract the last word from a string
-	local function getLastWord(str)
-		local lastWord = str:match("%S+$")
-		return lastWord or ""
-	end
-	print("Grouping items...")
-	-- Create a table to store the grouped items
-	local groupedItems = {}
-
-	-- Group items by their last word
-	for _, requestedItem in pairs(requestedItems) do
-		local displayName = requestedItem['name']
-		local lastWord = getLastWord(displayName)
-
-		if not groupedItems[lastWord] then
-			groupedItems[lastWord] = {}
-		end
-
-		table.insert(groupedItems[lastWord], requestedItem)
-	end
-	print("Sorting items alphabetically within their respective groups...")
-	-- Sort items within each group alphabetically
-	for _, group in pairs(groupedItems) do
-		table.sort(group, function(a, b)
+		print("Sorting items alphabetically...")
+		-- Sort items alphabetically first
+		table.sort(requestedItems, function(a, b)
+			if a['name'] == b['name'] then
+				return a['originalIndex'] < b['originalIndex'] -- Compare original indexes as a secondary criterion
+			end
 			return a['name'] < b['name']
-			end)
-	end
-	print("Flattening resulting table back into requested items table...")
-	-- Flatten the grouped items back into the requested items table
-	requestedItems = {}
-	for _, group in pairs(groupedItems) do
-		for _, item in pairs(group) do
-			table.insert(requestedItems, item)
-		end
-	end
-	print("Updating information about requested and craftable items...")
-	-- Update the item information
-	for _, requestedItem in pairs(requestedItems) do
-		local displayName = requestedItem['name']
-		-- Check if the item is available in the ME Craftable Items list and get the details
-		for _, craftableItem in pairs(craftableItems) do
-			requestedItem['status'] = "Not available"
-			if string.lower(craftableItem.displayName) == string.lower(displayName) then
-				requestedItem['id'] = craftableItem.name
-				requestedItem['fingerprint'] = craftableItem.fingerprint
-				requestedItem['craftable'] = craftableItem.isCraftable
-				requestedItem['storedQuantity'] = craftableItem.amount or 0
-				requestedItem['status'] = "Available"
-				break
-			end
-		end
-		-- Check if the item is available in the ME items list and get the details
-		for _, listItem in pairs(meItemList) do
-			requestedItem['status'] = "No match"
-			if string.lower(listItem.displayName) == string.lower(displayName) then
-				requestedItem['id'] = listItem.name
-				requestedItem['fingerprint'] = listItem.fingerprint
-				requestedItem['craftable'] = listItem.isCraftable
-				requestedItem['storedQuantity'] = listItem.amount or 0
-				requestedItem['status'] = "Match"	
-				break
-			end
-		end
-	end
+		end)
 
-	print("Saving " .. #requestedItems .. " requested items...")
-	janus.save("requestedItems.tmp", requestedItems)
-	releaseFileLock()
+		-- Sorting function with optimization
+		local addedItems = {} -- Table to keep track of added items
+		local sortedList = {} -- Initialize the sorted list
+
+		-- Iterate through each item in requestedItems
+		for index, requestedItem in ipairs(requestedItems) do
+			local displayName = requestedItem['name']
+			local lastWord = getLastWord(displayName)
+
+			print("Processing item: " .. displayName .. ", lastWord: " .. lastWord)
+
+			if hasOneWord(displayName) or not addedItems[displayName] then
+				-- If the item has only one word or is not already added, add it to sortedList
+				table.insert(sortedList, requestedItem)
+				addedItems[displayName] = true -- Mark the full display name as added
+
+				-- Check the rest of the list and find items with multiple words whose last word matches the current item
+				for i = index + 1, #requestedItems do
+					local nextItem = requestedItems[i]
+					local nextDisplayName = nextItem['name']
+					local nextLastWord = getLastWord(nextDisplayName)
+
+					if nextLastWord == lastWord and not addedItems[nextDisplayName] then
+						table.insert(sortedList, nextItem)
+						addedItems[nextDisplayName] = true -- Mark the full display name of the next item as added
+					end
+				end
+			end
+		end
+
+		print("Flattening resulting table back into requested items table...")
+		-- Update requestedItems with the grouped items
+		requestedItems = sortedList
+
+
+		print("Updating information about requested and craftable items...")
+		-- Update the item information
+		for _, requestedItem in pairs(requestedItems) do
+			local displayName = requestedItem['name']
+			-- Check if the item is available in the ME Craftable Items list and get the details
+			for _, craftableItem in pairs(craftableItems) do
+				requestedItem['status'] = "Not available"
+				if string.lower(craftableItem.displayName) == string.lower(displayName) then
+					requestedItem['id'] = craftableItem.name
+					requestedItem['fingerprint'] = craftableItem.fingerprint
+					requestedItem['craftable'] = craftableItem.isCraftable
+					requestedItem['storedQuantity'] = craftableItem.amount or 0
+					requestedItem['status'] = "Available"
+					break
+				end
+			end
+			-- Check if the item is available in the ME items list and get the details
+			for _, listItem in pairs(meItemList) do
+				requestedItem['status'] = "No match"
+				if string.lower(listItem.displayName) == string.lower(displayName) then
+					requestedItem['id'] = listItem.name
+					requestedItem['fingerprint'] = listItem.fingerprint
+					requestedItem['craftable'] = listItem.isCraftable
+					requestedItem['storedQuantity'] = listItem.amount or 0
+					requestedItem['status'] = "Match"	
+					break
+				end
+			end
+		end
+
+		print("Saving " .. #requestedItems .. " requested items...")
+		janus.save("requestedItems.tmp", requestedItems)
+	end
+	isFileLocked = false
 end
 
 -- Function to craft items to match the requested amounts
 local function craftCycle()
-	getFileLock()
-	local requestedItems = janus.load("requestedItems.tmp")
-	for i, requestedItem in pairs(requestedItems) do
-		local name = requestedItem['id']
-		local matchingMeItem = meBridge.getItem({name = name}) -- Always get live, accurate, information
-		if not matchingMeItem then -- Gotta check if it's nil!
-			-- Handle the problem properly so the loop may continue
-			-- Possible solutions: 
-				-- Remove the offending item and suggest the user add it through the chest instead
-				-- Attempt another method of getting the required information about the item
-				-- Ask the user to manually enter the required information
-			print("No match found for item " .. name .. "! Cannot continue craft cycle!")
-			releaseFileLock() -- Must release the file lock, otherwise the craftCycle() hangs indefinitely
-			return -- Loop can't continue because requestedItems is essentially corrupted
-		end
-		requestedItem['storedQuantity'] = matchingMeItem['amount']
-		requestedItem['craftable'] = matchingMeItem['isCraftable']
-		local fingerprint = requestedItem['fingerprint']
-		local craftable = requestedItem['craftable']
-		local requestedQuantity = requestedItem['requestedQuantity']
-		local displayName = requestedItem['name']
-		local count = requestedItem['storedQuantity']
-		if requestedItem['paused'] == nil then
-			requestedItem['paused'] = false
-		end
-		local itemPaused = requestedItem['paused']
+	if not isFileLocked then
+		isFileLocked = true
+		local requestedItems = janus.load("requestedItems.tmp")
+		local statusStore = janus.load("statusStore.tmp")
+		statusStore = {}
+		for i, requestedItem in pairs(requestedItems) do
+			local name = requestedItem['id']
+			local matchingMeItem = meBridge.getItem({name = name}) -- Always get live, accurate information
 
-		-- If the item is paused, we skip processing
-		if not itemPaused then
-			-- Reset the status message for each item
-			 requestedItem['status'] = ""
-			-- If the item is already crafting, we skip processing
-			if not meBridge.isItemCrafting({ name = name}) then
-				-- If the stored quantity is lower than the requested Quantity, we move to the next step...
-				if count < requestedQuantity then
-					-- ...which checks if the item is craftable...
+			if not matchingMeItem then
+				releaseFileLock() -- Must release the file lock; otherwise, the craftCycle() hangs indefinitely
+				return -- Loop can't continue because requestedItems is essentially corrupted
+			elseif matchingMeItem then
+				requestedItem['storedQuantity'] = matchingMeItem['amount']
+				requestedItem['craftable'] = matchingMeItem['isCraftable']
+			end
+
+			local craftable = requestedItem['craftable']
+			local requestedQuantity = requestedItem['requestedQuantity']
+			local displayName = requestedItem['name']
+			local count = requestedItem['storedQuantity']
+
+			if requestedItem['paused'] == nil then
+				requestedItem['paused'] = false
+			end
+			local itemPaused = requestedItem['paused']
+
+			-- If the item is paused, we skip processing
+			if not itemPaused then
+				-- Reset the status message for each item
+				requestedItem['status'] = ""
+				-- If the item is already crafting, we skip processing
+				if not meBridge.isItemCrafting({ name = name }) then
+					-- If the stored quantity is lower than the requested Quantity, we move to the next step...
+					if count < requestedQuantity then
+						-- ...which checks if the item is craftable...
 						if craftable then
 							-- if it is craftable, we order the crafting
 							local craftOrder = { name = name, count = requestedQuantity - count }
-							meBridge.craftItem(craftOrder)
-								requestedItem['status'] = "Attempting to craft..."
+							local maxRetryCount = 5
+							local retryCount = 0
+
+							while retryCount <= maxRetryCount do
+								meBridge.craftItem(craftOrder)
+								os.sleep(0.2)
+								if not meBridge.isItemCrafting(craftOrder) then
+									-- Crafting failed, reduce the craft order count by 25% and retry
+									craftOrder.count = math.max(1, math.floor(craftOrder.count * 0.75))
+									retryCount = retryCount + 1
+								else
+									requestedItem['status'] = "Attempting to craft..."
+									break
+								end
+							end
+
+							if retryCount > maxRetryCount then
+								requestedItem['status'] = "Waiting for items..."
+								print("Waiting for items...")
+							end
 						elseif not craftable then
-							 requestedItem['status'] = "Not craftable :("
+							requestedItem['status'] = "Not craftable :("
 						end
 					elseif count >= requestedQuantity then
 						local ratio = count / requestedQuantity
@@ -272,99 +233,85 @@ local function craftCycle()
 							requestedItem['status'] = "Why's on the list?!"
 						end
 					end
-			else
+				else
 					requestedItem['status'] = "Crafting..."
-			 end
-	elseif itemPaused and meBridge.isItemCrafting({ name = name}) then -- Case where the item is paused but some other source started a crafting job
-			requestedItem['status'] = "Manual crafting..."
-	else
-			requestedItem['status'] = "Paused"
+				end
+			else
+				requestedItem['status'] = "Paused"
+			end
+			-- Save the status message, displayName, and id to the statusStore table
+			table.insert(statusStore, { displayName = displayName, id = name, status = requestedItem['status'] })
 		end
+		janus.save("statusStore.tmp", statusStore)
 	end
-	janus.save("requestedItems.tmp", requestedItems)
-	releaseFileLock()
+	isFileLocked = false
 end
 
--- Function to check if a command is alreay processed
+
+-- Function to check if a command is already processed
 local function isCommandProcessed(commandId, responseFile)
-	local file = io.open(responseFile, "r")
-	if file then
-		for line in file:lines() do
-			local responseData = textutils.unserializeJSON(line)
-			if responseData.id == commandId then
-				file:close()
-				return true
-			end
+	local responseQueue = janus.load(responseFile, {})
+	for _, responseData in ipairs(responseQueue) do
+		if responseData.id == commandId then
+			return true
 		end
-		file:close()
 	end
 	return false
 end
 
 -- Function to process user commands
 local function processCommand(input, override)
-	if not isFileLocked or override then -- Override is used when the processCommand is called from processLensCommands
-		isFileLocked = true
-		local command, args = input:match("(%S+)%s*(.*)")
+	getFileLock()
+	local command, args = input:match("(%S+)%s*(.*)")
 
-		if commands[command] then
-			local commandArgs = {}
-			for arg in args:gmatch("%S+") do
-				table.insert(commandArgs, arg)
-			end
-
-			commands[command].handler(unpack(commandArgs))
-			print(unpack(commandArgs))
-
-			-- Return a simple response string
-			isFileLocked = false
-			return "command finished processing"
-		else
-			isFileLocked = false
-			return "Invalid command"
+	if commands[command] then
+		local commandArgs = {}
+		for arg in args:gmatch("%S+") do
+			table.insert(commandArgs, arg)
 		end
+
+		commands[command].handler(unpack(commandArgs))
+		print(unpack(commandArgs))
+		
+		releaseFileLock()
+		return "command finished processing"
+	else
+		
+		releaseFileLock()
+		return "Invalid command"
 	end
+	releaseFileLock()
 end
 
 -- Function to read and process commands from the command queue
 local function processLensCommands()
-    if not isFileLocked then
-        isFileLocked = true
-        local file = io.open(commandQueue, "r")
-        if file then
-            local responseQueue = {}
-            for line in file:lines() do
-                local commandData = textutils.unserializeJSON(line)
-                local commandId = commandData.id
-                if not isCommandProcessed(commandId, commandRespond) then
-                    local response = processCommand(commandData.cmd, true)
-                    print(commandId .. " " .. response)
-                    table.insert(responseQueue, { id = commandId, response = response })
-                else
-                    print(commandId .. " command already processed")
-                end
-            end
-            file:close()
+	getFileLock()
+	local commandQueue = janus.load("commandQueue.tmp", {})
+	local responseQueue = {}
+	for _, commandData in ipairs(commandQueue) do
+		local commandId = commandData.id
+		if not isCommandProcessed(commandId, "commandResponses.tmp") then
+			local response = processCommand(commandData.cmd, true)
+			print(commandId .. " " .. response)
+			table.insert(responseQueue, { id = commandId, response = response })
+		else
+			print(commandId .. " command already processed")
+		end
+	end
 
-            file = io.open(commandRespond, "a") -- Use "a" mode to append to the response file
-            if file then
-                for _, responseData in ipairs(responseQueue) do
-                    local serializedResponse = textutils.serializeJSON(responseData)
-                    file:write(serializedResponse .. "\n")
-                end
-                file:close()
-            end
-        end
-        isFileLocked = false
-    end
+	janus.save("commandResponses.tmp", responseQueue)
+
+	releaseFileLock()
 end
 
 
 -- Main program loop
 local function mainLoop()
+
 	while true do
 		updateRequestedItems()
-		janus.nap(60)
+
+		janus.nap(30)
 	end
 end
 

@@ -1,15 +1,122 @@
+-- The commands.lua file is mostly responsible for requestedItems list manipulation.
+-- Anything to do with modifying/adding/removing/pausing items should reside here.
+-- This file does not interact with the ME Bridge whatsoever.
+
 local janus = require('../libjanus')
 local response = "Command executed"
-commands = {
-	update = {
-		description = "Update the requestedItems list with items from the adjacent inventory",
-		handler = function()
-			response = "Inventory updated successfully"
-			updateRequestedItems()
-			print(response)
-			return response
+
+local validTypes = {"chest", "shulker_box", "barrel", "backpack"}
+
+-- Utility functions
+-- Helper function to find an item index by Display Name
+local function finditemIndex(requestedItems, displayName)
+	for i, requestedItem in ipairs(requestedItems) do
+		if requestedItem['name'] == displayName then
+			return i
 		end
-	},
+	end
+	return nil
+end
+
+-- Function to check if an inventory exists (or, truthfully, if part of its id matches the above strings)
+local function isInventory()
+	for _, side in ipairs(peripheral.getNames()) do
+		local peripheralType = peripheral.getType(side)
+		for _, validType in ipairs(validTypes) do
+			if peripheralType and string.find(string.lower(peripheralType), string.lower(validType)) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Function to get the inventory object
+local function getInventory()
+	for _, side in ipairs(peripheral.getNames()) do
+		local peripheralType = peripheral.getType(side)
+		for _, validType in ipairs(validTypes) do
+			if peripheralType and string.find(string.lower(peripheralType), string.lower(validType)) then
+				return peripheral.wrap(side)
+			end
+		end
+	end
+	return nil
+end
+
+-- List manipulation functions
+-- Function to modify an item in the requested items list, based on Display Name
+local function modifyItem(requestedItems, displayName, newRequestedQuantity)
+	local itemIndex = finditemIndex(requestedItems, displayName)
+
+	if itemIndex then
+		requestedItems[itemIndex]['requestedQuantity'] = newRequestedQuantity
+		print("Modified requested quantity for item '" .. displayName .. "'")
+	else
+		print("Item '" .. displayName .. "' not found in the requested items list")
+	end
+end
+
+-- Function to perform an action (pause, unpause, or remove) on an item in the requested items list, based on Display Name
+local function performAction(requestedItems, action, displayName)
+	local itemIndex = finditemIndex(requestedItems, displayName)
+
+	if itemIndex then
+		if action == "pause" then
+			requestedItems[itemIndex]['paused'] = true
+			print("Item '" .. displayName .. "' paused successfully")
+		elseif action == "unpause" then
+			requestedItems[itemIndex]['paused'] = false
+			print("Item '" .. displayName .. "' unpaused successfully")
+		elseif action == "remove" then
+			table.remove(requestedItems, itemIndex)
+			print("Item '" .. displayName .. "' removed successfully")
+		end
+	else
+		print("Item '" .. displayName .. "' not found in the requested items list")
+	end
+end
+
+-- Function to add items from the inventory to the requested items list
+local function addInventoryItems(requestedItems)
+	if not isInventory() then
+		return
+	end
+
+	local inventory = getInventory()
+	local inventorySize = inventory.size()
+
+	for slot = 1, inventorySize do
+		local item = inventory.getItemDetail(slot)
+
+		if item then
+			local existingItem = false
+
+			for _, requestedItem in ipairs(requestedItems) do
+				if string.lower(requestedItem['name']) == string.lower(item.displayName) then
+					existingItem = true
+					break
+				end
+			end
+
+			if not existingItem then
+				table.insert(requestedItems, {
+					id = "",
+					requestedQuantity = stockAmount,
+					storedQuantity = 0,
+					name = displayName,
+					craftable = false,
+					paused = true,
+					status = "Pending update...",
+					fingerprint = ""
+				})
+			end
+		end
+	end
+end
+
+commands = {
+
 	add = {
 		description = "Add items to the requestedItems list",
 		handler = function(...)
@@ -17,51 +124,10 @@ commands = {
 			local requestedItems = janus.load("requestedItems.tmp")
 
 			if args[1] == "inventory" then
-				if isInventory() then
-					local inventory = getInventory()
-					local inventorySize = inventory.size()
-					print("Inventory size is ".. inventorySize)
-					for slot = 1, inventorySize do
-						local item = inventory.getItemDetail(slot)
-
-						if item then
-							local existingItem = false
-
-							for _, requestedItem in ipairs(requestedItems) do
-								if string.lower(requestedItem['name']) == string.lower(item.displayName) then
-									existingItem = true
-									break
-								end
-							end
-
-							if not existingItem then
-								local isCraftable = meBridge.isItemCraftable(item)
-								--table.insert(requestedItems, {item.name, "", item.count, item.displayName, isCraftable})
-								local requestedItem = {}
-								requestedItem['id'] = item.name
-								requestedItem['requestedQuantity'] = item.count
-								requestedItem['name'] = item.displayName
-								requestedItem['craftable'] = item.isCraftable
-								table.insert(requestedItems, requestedItem)
-							end
-						end
-					end
-
-					janus.save("requestedItems.tmp", requestedItems)
-					response = "Inventory items added successfully"
-				end
+				addInventoryItems(requestedItems)
 			else
-				local displayName
-				local stockAmount
-
-				-- Check if the last argument is a number
-				if tonumber(args[#args]) then
-					displayName = table.concat(args, " ", 1, #args - 1)
-					stockAmount = tonumber(args[#args])
-				else
-					displayName = table.concat(args, " ")
-					stockAmount = 0
-				end
+				local displayName = table.concat(args, " ", 1, #args - 1)
+				local stockAmount = tonumber(args[#args]) or 0
 
 				local existingItem = false
 
@@ -73,19 +139,23 @@ commands = {
 				end
 
 				if not existingItem then
-					--table.insert(requestedItems, {"", "", stockAmount, displayName, false})
-					local requestedItem = {}
-					requestedItem['id'] = ""
-					requestedItem['requestedQuantity'] = stockAmount
-					requestedItem['name'] = displayName
-					requestedItem['craftable'] = false
-					table.insert(requestedItems, requestedItem)
+					table.insert(requestedItems, {
+						id = "",
+						requestedQuantity = stockAmount,
+						storedQuantity = 0,
+						name = displayName,
+						craftable = false,
+						paused = true,
+						status = "Pending update...",
+						fingerpring = "",
+					})
 					response = "Item '" .. displayName .. "' added with stock amount: " .. stockAmount
 				else
 					response = "Item '" .. displayName .. "' already exists in the requested items list"
 				end
+
 			end
-    		janus.save("requestedItems.tmp", requestedItems)
+			janus.save("requestedItems.tmp", requestedItems)
 			print(response)
 			print("List updated!")
 			return response
@@ -97,44 +167,39 @@ commands = {
 		handler = function(...)
 			local args = {...}
 			local requestedItems = janus.load("requestedItems.tmp")
+			local newRequestedQuantity = tonumber(table.remove(args))
 
-			-- Check if the arguments contain index numbers and the new 'min' value
-			local indexNumbers = {}
-			local newMinValue = tonumber(table.remove(args))
-			if not newMinValue then
-				response = "Invalid 'min' value provided"
-				return response
-			end
+			if not newRequestedQuantity then
+				response = "Invalid quantity provided"
+			else
+				local indexNumbers = {}
 
-			-- This for loop is probably unecessary. The call to table.remove() with args
-			-- removes the last element of the args array. That last element was the new min
-			-- value. The remaining elements of args should now all be index numbers, which
-			-- means there is no point in copying the array (which is all this for loop does)
-			for _, arg in ipairs(args) do
-				local index = tonumber(arg)
-				if index then
-					table.insert(indexNumbers, index)
-				end
-			end
-
-			-- Check if index numbers are present
-			if #indexNumbers > 0 then
-				-- Modify the 'min' value for items in the requested items list using the index numbers
-				for _, index in ipairs(indexNumbers) do
-					if index >= 1 and index <= #requestedItems then -- Check if index is within bounds :thumbsup:
-						local item = requestedItems[index]
-						item['requestedQuantity'] = newMinValue
-						print("Modified requested quantity for item at index " .. index)
+				-- Separate index numbers and display names
+				for _, arg in ipairs(args) do
+					local index = tonumber(arg)
+					if index then
+						table.insert(indexNumbers, index)
 					else
-						print("Invalid index number: " .. index)
+						modifyItem(requestedItems, arg, newRequestedQuantity)
 					end
 				end
-				response = "Items modified successfully"
-				janus.save("requestedItems.tmp", requestedItems)
-			else
-				response = "Please provide the index number(s) of the item(s) to modify"
+
+				-- Modify items based on index numbers
+				if #indexNumbers > 0 then
+					for _, index in ipairs(indexNumbers) do
+						if index >= 1 and index <= #requestedItems then
+							local item = requestedItems[index]
+							item['requestedQuantity'] = newRequestedQuantity
+							print("Modified requested quantity for item at index " .. index)
+						else
+							print("Invalid index number: " .. index)
+						end
+					end
+					response = "Items modified successfully"
+				end
 			end
 
+			janus.save("requestedItems.tmp", requestedItems)
 			print(response)
 			return response
 		end
@@ -146,59 +211,34 @@ commands = {
 			local args = {...}
 			local requestedItems = janus.load("requestedItems.tmp")
 
-			-- Check if the arguments contain index numbers or "all"
-			local indexNumbers = {}
-			local pauseAll = false
-			for _, arg in ipairs(args) do
-				if arg == "all" then
-					pauseAll = true
-					break
-				end
-
-				local index = tonumber(arg)
-				if index then
-					table.insert(indexNumbers, index)
-				end
-			end
-
-			-- If "all" is provided, pause all items
-			if pauseAll then
+			if args[1] == "all" then
 				for _, item in ipairs(requestedItems) do
 					item['paused'] = true
 				end
 				response = "All items paused with no exception!"
 			else
-				-- Check if index numbers are present
-				if #indexNumbers > 0 then
-					-- Set the 'paused' key to true for items in the requested items list using the index numbers
-					for _, index in ipairs(indexNumbers) do
-						if index >= 1 and index <= #requestedItems then
-							local item = requestedItems[index]
+				for _, arg in ipairs(args) do
+					local index = tonumber(arg)
+					if index then
+						local item = requestedItems[index]
+						if item then
 							item['paused'] = true
-							print("Item '" .. item['name'] .. "' paused successfully")
+							print("Item at index " .. index .. " paused successfully")
 						else
 							print("Invalid index number: " .. index)
 						end
-					end
-					response = "Items paused successfully"
-				else
-					-- No index numbers provided, treat the arguments as the display name
-					local displayName = table.concat(args, " ")
-					if displayName == "" then
-						respone = "Please provide the display name or index number(s) of the item(s) to pause"
 					else
-						pauseItem(displayName)
-						response = "Item ".. displayName .." paused successfully"
+						performAction(requestedItems, "pause", arg)
 					end
 				end
+				response = "Items paused successfully"
 			end
-			janus.save("requestedItems.tmp", requestedItems)
 
+			janus.save("requestedItems.tmp", requestedItems)
 			print(response)
 			return response
 		end
 	},
-
 
 	unpause = {
 		description = "Unpause item(s) in the requested items list",
@@ -206,55 +246,30 @@ commands = {
 			local args = {...}
 			local requestedItems = janus.load("requestedItems.tmp")
 
-			-- Check if the arguments contain index numbers or "all"
-			local indexNumbers = {}
-			local unpauseAll = false
-			for _, arg in ipairs(args) do
-				if arg == "all" then
-					unpauseAll = true
-					break
-				end
-
-				local index = tonumber(arg)
-				if index then
-					table.insert(indexNumbers, index)
-				end
-			end
-
-			-- If "all" is provided, unpause all items
-			if unpauseAll then
+			if args[1] == "all" then
 				for _, item in ipairs(requestedItems) do
 					item['paused'] = false
 				end
 				response = "All items unpaused with no exception!"
 			else
-				-- Check if index numbers are present
-				if #indexNumbers > 0 then
-					-- Set the 'pause' to false for items in the requested items list using the index numbers
-					for _, index in ipairs(indexNumbers) do
-						if index >= 1 and index <= #requestedItems then
-							local item = requestedItems[index]
+				for _, arg in ipairs(args) do
+					local index = tonumber(arg)
+					if index then
+						local item = requestedItems[index]
+						if item then
 							item['paused'] = false
-							print("Item '" .. item['name'] .. "' paused successfully")
+							print("Item at index " .. index .. " unpaused successfully")
 						else
 							print("Invalid index number: " .. index)
 						end
-					end
-					response = "Items unpaused successfully"
-				else
-					-- No index numbers provided, treat the arguments as the display name
-					local displayName = table.concat(args, " ")
-					if displayName == "" then
-						response = "Please provide the display name or index number(s) of the item(s) to pause"
 					else
-						unpauseItem(displayName)
-						response = "Item ".. displayName .." unpaused successfully"
+						performAction(requestedItems, "unpause", arg)
 					end
 				end
+				response = "Items unpaused successfully"
 			end
 
 			janus.save("requestedItems.tmp", requestedItems)
-
 			print(response)
 			return response
 		end
@@ -266,48 +281,28 @@ commands = {
 			local args = {...}
 			local requestedItems = janus.load("requestedItems.tmp")
 
-			-- Helper function to remove items based on indexes
-			local function removeItemsByIndexes(indexNumbers)
-				-- Sort the index numbers in descending order to ensure correct removal
-				table.sort(indexNumbers, function(a, b) return a > b end)
-
-				-- Remove items from the requestedItems list using the index numbers
-				for _, index in ipairs(indexNumbers) do
-					if index >= 1 and index <= #requestedItems then
-						local removedItem = table.remove(requestedItems, index)
-						print("Item '" .. removedItem['name'] .. "' removed successfully")
+			if args[1] == "all" then
+				requestedItems = {}
+				response = "All items removed with no exception!"
+			else
+				for _, arg in ipairs(args) do
+					local index = tonumber(arg)
+					if index then
+						local item = requestedItems[index]
+						if item then
+							table.remove(requestedItems, index)
+							print("Item at index " .. index .. " removed successfully")
+						else
+							print("Invalid index number: " .. index)
+						end
 					else
-						print("Invalid index number: " .. index)
+						performAction(requestedItems, "remove", arg)
 					end
 				end
-			end
-
-			-- Check if the arguments contain index numbers
-			local indexNumbers = {}
-			for _, arg in ipairs(args) do
-				local index = tonumber(arg)
-				if index then
-					table.insert(indexNumbers, index)
-				end
-			end
-
-			-- Check if index numbers are present
-			if #indexNumbers > 0 then
-				removeItemsByIndexes(indexNumbers)
 				response = "Items removed successfully"
-			else
-				-- No index numbers provided, treat the arguments as the display name
-				local displayName = table.concat(args, " ")
-				if displayName == "" then
-					response = "Please provide the display name or index number(s) of the item(s) to remove"
-				else
-					removeItem(displayName)
-					response = "Item ".. displayName .." removed successfully"
-				end
 			end
 
 			janus.save("requestedItems.tmp", requestedItems)
-
 			print(response)
 			return response
 		end
