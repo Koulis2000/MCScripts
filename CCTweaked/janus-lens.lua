@@ -79,6 +79,10 @@ local g = Waltz.create(w, theme, "Janus Lens")
 print("Initialising status label...")
 local lblStatus = nil
 
+local function cChar(decimal)
+    return string.char("0x"..string.format("%X", decimal))
+end
+
 -- Sets the text of the status label
 local function setStatus(status)
 	local x, y = w.getSize() -- Get size of the monitor
@@ -114,8 +118,8 @@ local btnModify = nil
 local btnRemove = nil
 local selectedItems = {}
 
-local checkedCharacter = string.char(0x8)
-local uncheckedCharacter = string.char(0x7)
+local checkedCharacter = cChar(8)
+local uncheckedCharacter = cChar(7)
 
 -- Function to get the selected items as a space-separated string
 local function getSelected()
@@ -157,10 +161,23 @@ local processID = multishell.getCurrent()
 multishell.setTitle(processID, 'Janus Lens')
 
 -- Advanced Panel setup
-local borders = "br"
-local corners = "blbrtr"
-local borderChars = { t = string.char(0x8c), b = string.char(0x83), l = string.char(0x95), r = string.char(0x95) }
-local cornerChars = { tl = string.char(0x88), tr = string.char(0x96), bl = string.char(0x82), br = string.char(0x81) }
+local borderStyle = {
+	borders = "br",
+	corners = "blbrtr",
+	borderChars = { b = cChar(143), r = cChar(149) },
+	cornerChars = { tr = cChar(150), bl = cChar(142), br = cChar(129) },
+	borderColors = { b = colors.lightBlue, r = colors.lightBlue },
+	cornerColors = { tr = colors.lightBlue, bl = colors.lightBlue, br = colors.lightBlue }
+}
+
+local actBorderStyle = {
+	borders = "br",
+	corners = "blbrtr",
+	borderChars = { b = cChar(134), r = cChar(134) },
+	cornerChars = { tr = cChar(134), bl = cChar(134), br = cChar(134) },
+	borderColors = { b = colors.orange, r = colors.orange },
+	cornerColors = { tr = colors.orange, bl = colors.orange, br = colors.orange }
+}
 
 printStatus("Initialising panels...")
 local slices = 17
@@ -175,11 +192,11 @@ local panels = {
 	--pnlRequestedQuantity = Panel.create(g, "Requested", column1+column2+1, 3, column3, sizeY - 4, true),
 	--pnlStatus = Panel.create(g, "Status", column1+column2+column3+1, 3, column4-1, sizeY - 4, true),
 	--pnlActions = Panel.create(g, "ACT", column1+column2+column3+column4+2, 3, column5, sizeY - 4, false),
-	pnlDisplayName = AdvancedPanel.create(g, string.char(0x98).. " " .. "Name", "left", 1, 3, column1, sizeY - 4, borders, corners, borderChars, cornerChars),
-	pnlStoredQuantity = AdvancedPanel.create(g, string.char(0x98).. " " .. "Stored", "left", column1+1, 3, column2, sizeY - 4, borders, corners, borderChars, cornerChars),
-	pnlRequestedQuantity = AdvancedPanel.create(g, string.char(0x98).. " " .. "Requested", "left", column1+column2+1, 3, column3, sizeY - 4, borders, corners, borderChars, cornerChars),
-	pnlStatus = AdvancedPanel.create(g, string.char(0x98).. " " .. "Status", "left", column1+column2+column3+1, 3, column4, sizeY - 4, borders, corners, borderChars, cornerChars),
-	pnlActions = AdvancedPanel.create(g, string.char(0x98).. " " .. "ACT", "left", column1+column2+column3+column4+1, 3, column5, sizeY - 4),
+	pnlDisplayName = AdvancedPanel.create(g, string.char(0x98).. " " .. "Name", colors.gray, "left", 1, 3, column1, sizeY - 4, borderStyle),
+	pnlStoredQuantity = AdvancedPanel.create(g, string.char(0x98).. " " .. "Stored", colors.gray, "left", column1+1, 3, column2, sizeY - 4, borderStyle),
+	pnlRequestedQuantity = AdvancedPanel.create(g, string.char(0x98).. " " .. "Requested", colors.gray, "left", column1+column2+1, 3, column3, sizeY - 4, borderStyle),
+	pnlStatus = AdvancedPanel.create(g, string.char(0x98).. " " .. "Status", colors.gray, "left", column1+column2+column3+1, 3, column4, sizeY - 4, borderStyle),
+	pnlActions = AdvancedPanel.create(g, string.char(0x98).. " " .. "ACT", colors.orange, "left", column1+column2+column3+column4+1, 3, column5+3, sizeY - 4, actBorderStyle),
 }
 for _, p in pairs(panels) do
 	print("\tPanel " .. p:getTitle() .. " added.")
@@ -389,25 +406,25 @@ function updateInfo()
 
 	-- Add the pauseAll button
 	if not btnPauseAll then
-		btnPauseAll = Button.create(g, "STOP", colors.white, colors.red, 1, 2, 7, 3)
+		btnPauseAll = Button.create(g, "STOP", colors.white, colors.red, 1, 2, 5, 3)
 		panels.pnlActions:addComponent(btnPauseAll)
 	end
 
 	-- Add the pause
 	if not btnPause then
-		btnPause = Button.create(g, "PAUS", colors.white, colors.gray, 1, 6, 7, 3)
+		btnPause = Button.create(g, "PAUS", colors.white, colors.gray, 1, 6, 5, 3)
 		panels.pnlActions:addComponent(btnPause)
 	end
 
 	-- Add the modify button
 	if not btnModify then
-		btnModify = Button.create(g, "MOD", colors.white, colors.gray, 1, 10, 7, 3)
+		btnModify = Button.create(g, "MOD", colors.white, colors.gray, 1, 10, 5, 3)
 		panels.pnlActions:addComponent(btnModify)
 	end
 
 	-- Add the remove button
 	if not btnRemove then
-		btnRemove = Button.create(g, "REM", colors.white, colors.gray, 1, 14, 7, 3)
+		btnRemove = Button.create(g, "REM", colors.white, colors.gray, 1, 14, 5, 3)
 		panels.pnlActions:addComponent(btnRemove)
 	end
 
