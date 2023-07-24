@@ -101,10 +101,10 @@ local function addInventoryItems(requestedItems)
 
 			if not existingItem then
 				table.insert(requestedItems, {
-					id = "",
-					requestedQuantity = requestedQuantity,
+					id = item.name,
+					requestedQuantity = item.count,
 					storedQuantity = 0,
-					name = displayName,
+					name = item.displayName,
 					craftable = false,
 					paused = true,
 					status = "Pending update...",

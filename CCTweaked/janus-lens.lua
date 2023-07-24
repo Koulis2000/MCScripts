@@ -296,7 +296,12 @@ function updateInfo()
 		local displayName = v['name']
 		local storedQuantity = v['storedQuantity']
 		local requestedQuantity = v['requestedQuantity']
-		local status = statusStore[k]['status']
+		local status
+		if statusStore[k] == nil then
+			status = "Pending update..."
+		else
+			status = statusStore[k]['status']
+		end
 		local checkBox = uncheckedCharacter
 
 		local formattedIndex = k -- the formatted index adds white spaces in front of the index number in order to align the text better
