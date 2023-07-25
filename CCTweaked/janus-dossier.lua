@@ -65,21 +65,21 @@ local function updateRequestedItems()
 		-- Update the requested items table with information from the ME network
 		print("Loading requestedItems...")
 		local requestedItems = janus.load("requestedItems.tmp")
-		if ( == nil) then
+		if (requestedItems == nil) then
 			print("\trequestedItems" .. " is nil!")
 			return
 		end
 		print("\t" .. #requestedItems .. " items requested.")
 		print("Getting list of craftable items in ME network...")
 		local craftableItems = getCraftableItems()
-		if ( == nil) then
+		if (craftableItems == nil) then
 			print("\tcraftableItems" .. " is nil!")
 			return
 		end
 		print("\t" .. #craftableItems .. " items craftable by ME network.")
 		print("Updating list of items in ME network...")
 		local meItemList = meBridge.listItems()
-		if ( == nil) then
+		if (meItemList == nil) then
 			print("\tmeItemList" .. " is nil!")
 			return
 		end
