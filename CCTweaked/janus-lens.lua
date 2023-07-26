@@ -80,7 +80,7 @@ print("Initialising status label...")
 local lblStatus = nil
 
 local function cChar(decimal)
-    return string.char("0x"..string.format("%X", decimal))
+	return string.char("0x"..string.format("%X", decimal))
 end
 
 -- Sets the text of the status label
@@ -203,6 +203,35 @@ for _, p in pairs(panels) do
 	g:addComponent(p)
 end
 
+-- Function to round a number to geometric sequence (aka Computer Numbers 8, 16, 32 etc)
+local function roundToGeometricSequence(value, base)
+    -- Calculate the closest value in a geometric sequence with base 'base'
+    local power = math.log(value) / math.log(base)
+    local lowerValue = math.pow(base, math.floor(power))
+    local upperValue = math.pow(base, math.ceil(power))
+
+    -- Choose the closest value
+    local lowerDiff = math.abs(value - lowerValue)
+    local upperDiff = math.abs(upperValue - value)
+    if lowerDiff <= upperDiff then
+        return lowerValue
+    else
+        return upperValue
+    end
+end
+
+-- Function to perform calculation on a number and return the result
+local function performCalculation(firstNumber, calculation, secondNumber)
+	if calculation == "+" then
+		return firstNumber + amount
+	elseif calculation == "-" then
+		return firstNumber - amount
+	elseif calculation == "*" then
+		return firstNumber + roundToGeometricSequence(firstNumber * secondNumber, 2)
+	elseif calculation == "/" then
+		return firstNumber - roundToGeometricSequence(firstNumber / secondNumber, 2)
+	end
+end
 
 -- Function to write commands to the command queue
 local function enqueueCommand(command)
@@ -283,6 +312,21 @@ end
 
 local globalPause = false
 local lastUpdateTime = os.clock()
+
+local statusMappings = {
+	notCraftable = { text = "Not craftable :(", color = colors.red },
+	paused = { text = "Paused", color = colors.red },
+	noStoredOrRequested = { text = "No stonk but, no need?", color = colors.green },
+	noRequested = { text = "Stonked but, no need?", color = colors.green },
+	crafting = { text = "Crafting...", color = colors.blue },
+	attemptingToCraft = { text = "Attempting to craft...", color = colors.orange },
+	waitingForMaterials = { text = "Attempting to craft...", color = colors.orange },
+	stockedFlavourOne = { text = "Stonked!", color = colors.green },
+	stockedFlavourTwo = { text = "Doublestonked!", color = colors.green },
+	stockedFlavourThree = { text = "T-T-T-TRIPLESTONKED!", color = colors.green },
+	stockedFlavourFour = { text = "Why's on the list?!", color = colors.green },
+}
+
 function updateInfo()
 	if (os.clock() - lastUpdateTime) < 3 then
 		return 	-- less than 3 seconds since last info update, let's not do it again yet (to avoid excessive UI updates)
@@ -298,10 +342,13 @@ function updateInfo()
 		local requestedQuantity = v['requestedQuantity']
 		local status
 		if statusStore[k] == nil then
-			status = "Pending update..."
+			status = { text = "Pending update...", color = colors.white } -- Default color for pending update
 		else
-			status = statusStore[k]['status']
+			local statusLookup = statusStore[k]['status']
+			local statusMapping = statusMappings[statusLookup] or { text = "Unknown status", color = colors.white }
+			status = statusMapping.text
 		end
+
 		local checkBox = uncheckedCharacter
 
 		local formattedIndex = k -- the formatted index adds white spaces in front of the index number in order to align the text better
@@ -367,8 +414,10 @@ function updateInfo()
 			lblsStatus[k] = Label.create(g, status, textColor, theme['textBackgroundColour'], 2, k+1, 7, 1)
 			panels.pnlStatus:addComponent(lblsStatus[k])
 		else
+			lblsStatus[k]:setColours(color, theme['textBackgroundColour'])
 			lblsStatus[k]:setText("")
 			lblsStatus[k]:setText(status)
+			lblsStatus[k]:draw()
 		end
 		if not btnsMinus[k] then
 			btnsMinus[k] = Button.create(g, "-", theme['failureForegroundColour'], theme['failureBackgroundColour'], 0, k+1, 1, 1)
@@ -396,14 +445,14 @@ function updateInfo()
 
 		-- Click to increase requested quantity by 1
 		btnsPlus[k]:setAction(function(comp)
-			enqueueCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity+1))
+			enqueueCommand("modify " .. tostring(k) .. " " .. tostring(performCalculation(requestedQuantity, "*", 0.3)))
 			printStatus("Increased requested quantity for ".. displayName .. " by 1")
 			speaker.playSound("minecraft:entity.item_frame.add_item", 2)
 		end)
 
 		-- Click to decrease requested quantity by 1
 		btnsMinus[k]:setAction(function(comp)
-			enqueueCommand("modify " .. tostring(k) .. " " .. tostring(requestedQuantity-1))
+			enqueueCommand("modify " .. tostring(k) .. " " .. tostring(performCalculation(requestedQuantity, "/", 3)))
 			printStatus("Decreased requested quantity for ".. displayName .. " by 1")
 			speaker.playSound("minecraft:entity.item_frame.break", 2)
 		end)

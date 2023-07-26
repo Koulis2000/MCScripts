@@ -153,7 +153,7 @@ local function updateRequestedItems()
 					requestedItem['fingerprint'] = listItem.fingerprint
 					requestedItem['craftable'] = listItem.isCraftable
 					requestedItem['storedQuantity'] = listItem.amount or 0
-					requestedItem['status'] = "Match"	
+					requestedItem['status'] = "Match"
 					break
 				end
 			end
@@ -192,6 +192,7 @@ local function craftCycle()
 			if requestedItem['paused'] == nil then
 				requestedItem['paused'] = false
 			end
+
 			local itemPaused = requestedItem['paused']
 
 			-- If the item is paused, we skip processing
@@ -217,39 +218,38 @@ local function craftCycle()
 									craftOrder.count = math.max(1, math.floor(craftOrder.count * 0.75))
 									retryCount = retryCount + 1
 								else
-									requestedItem['status'] = "Attempting to craft..."
+									requestedItem['status'] = "attemptingToCraft"
 									break
 								end
 							end
 
 							if retryCount > maxRetryCount then
-								requestedItem['status'] = "Waiting for items..."
-								print("Waiting for items...")
+								requestedItem['status'] = "waitingForMaterials"
 							end
 						elseif not craftable then
-							requestedItem['status'] = "Not craftable :("
+							requestedItem['status'] = "notCraftable"
 						end
 					elseif storedQuantity >= requestedQuantity then
 						local ratio = storedQuantity / requestedQuantity
 						if ratio <= 1.1 then
-							requestedItem['status'] = "Stonked!"
+							requestedItem['status'] = "stockedFlavourOne"
 						elseif ratio <= 2 then
-							requestedItem['status'] = "Doublestonked!"
+							requestedItem['status'] = "stockedFlavourTwo"
 						elseif ratio <= 3 then
-							requestedItem['status'] = "T-T-T-TRIPLESTONKED!"
+							requestedItem['status'] = "stockedFlavourThree"
+						elseif ratio >= 3 then
+							requestedItem['status'] = "stockedFlavourFour"
 						elseif storedQuantity == 0 and requestedQuantity == 0 then
-							requestedItem['status'] = "No stonk but, no need?"
+							requestedItem['status'] = "noStoredOrRequested"
 						elseif storedQuantity > requestedQuantity and requestedQuantity == 0 then
-							requestedItem['status'] = "Stonked but, no need?"
-						else
-							requestedItem['status'] = "Why's on the list?!"
+							requestedItem['status'] = "noRequested"
 						end
 					end
 				else
-					requestedItem['status'] = "Crafting..."
+					requestedItem['status'] = "crafting"
 				end
 			else
-				requestedItem['status'] = "Paused"
+				requestedItem['status'] = "paused"
 			end
 			-- Save the status message, displayName, and id to the statusStore table
 			table.insert(statusStore, { displayName = displayName, id = name, status = requestedItem['status'] })
