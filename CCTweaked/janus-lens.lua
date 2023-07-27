@@ -346,7 +346,7 @@ function updateInfo()
 		else
 			local statusLookup = statusStore[k]['status']
 			local statusMapping = statusMappings[statusLookup] or { text = "Unknown status", color = colors.white }
-			status = statusMapping.text
+			status = statusMapping
 		end
 
 		local checkBox = uncheckedCharacter
@@ -411,12 +411,12 @@ function updateInfo()
 			lblsRequestedQuantity[k]:setText(requestedQuantity)
 		end
 		if not lblsStatus[k] then
-			lblsStatus[k] = Label.create(g, status, textColor, theme['textBackgroundColour'], 2, k+1, 7, 1)
+			lblsStatus[k] = Label.create(g, status.text, status.color, theme['textBackgroundColour'], 2, k+1, 7, 1)
 			panels.pnlStatus:addComponent(lblsStatus[k])
 		else
-			lblsStatus[k]:setColours(color, theme['textBackgroundColour'])
+			lblsStatus[k]:setColours(status.color, theme['textBackgroundColour'])
 			lblsStatus[k]:setText("")
-			lblsStatus[k]:setText(status)
+			lblsStatus[k]:setText(status.text)
 			lblsStatus[k]:draw()
 		end
 		if not btnsMinus[k] then
